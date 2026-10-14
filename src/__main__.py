@@ -1,35 +1,48 @@
-from llm_sdk import Small_LLM_Model
+from llm_sdk import Small_LLM_Model, torch
+from collections import deque
 
-ARBITRARY_GENERATION_LIMIT = 42
 
-model = Small_LLM_Model()
+def iterate_prompt() -> None:
+    PROMPT = "Slim Shady is one of the most influential figures that exist in fiction."
+    ITERATION = 420
 
-prompt = "My name is"
-# response = ""
+    model = Small_LLM_Model()
+    # response = ""
+    token_ids_tensor = model.encode(PROMPT)
+    token_ids: list[int] = token_ids_tensor.flatten().tolist()
+    queue_length = len(token_ids) * 2
 
-token_ids = model.encode(prompt)
-print()
-print(token_ids)
-print("-" * 10)
-print("Shape:", token_ids.shape)
-print("Dimentions:", token_ids.ndim)
-print("Type:", token_ids.dtype)
-print("Device:", token_ids.device)
-print("Requires Gradient:", token_ids.requires_grad)
-print()
+    print()
+    print("Iteration Count:", ITERATION)
+    print("Queue Length:", queue_length)
+    print("-" * 10)
+    print("Type:", token_ids_tensor.dtype)
+    print("Device:", token_ids_tensor.device)
+    print("-" * 10)
+    print(PROMPT)
+    print()
 
-input_ids: list[int] = token_ids.flatten().tolist()
+    input_ids = deque(token_ids, maxlen=queue_length)
 
-print(prompt, end="")
+    for _ in range(ITERATION):
+        logits = model.get_logits_from_input_ids(input_ids)
+        next_token_id = max(range(len(logits)), key=lambda i: logits[i])
+        decoded = model.decode([next_token_id])
+        print(decoded, end="", flush=True)
 
-for _ in range(ARBITRARY_GENERATION_LIMIT):
-    logits = model.get_logits_from_input_ids(input_ids)
-    next_token_id = max(range(len(logits)), key=lambda i: logits[i])
-    decoded = model.decode([next_token_id])
-    print(decoded, end="", flush=True)
+        # response += decoded
+        input_ids.append(next_token_id)
 
-    # response += decoded
-    input_ids.append(next_token_id)
+    # print()
+    # print(f"Response:\n{response}")
 
-# print()
-# print(f"Response:\n{response}")
+
+def main() -> None:
+    iterate_prompt()
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
