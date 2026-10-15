@@ -1,51 +1,39 @@
 import json
-from typing import Literal
-from pydantic import BaseModel, Field, ValidationError
+from typing import Literal, Any
+from pydantic import BaseModel, Field, ValidationError, TypeAdapter
 
 Type = Literal["string", "number"]
 
 
-class Parameter(BaseModel):
-    key: str = Field(min_length=1)
-    type_: Type
+class TypeModel(BaseModel):
+    type_: Type = Field(alias="type")
 
 
-class Function(BaseModel):
-    name: str
+class FunctionModel(BaseModel):
+    name: str = Field(min_length=1)
     description: str
-    parameters: list[Parameter] = Field(min_length=1)
-    returns: Type
+    parameters: dict[str, TypeModel] = Field(min_length=1)
+    returns: TypeModel
 
 
-def parse_functions(file_path: str) -> list[Function]:
-    functions: list[Function] = []
+def parse_functions(file_path: str) -> list[FunctionModel]:
+    functions: list[FunctionModel] = []
 
     try:
         with open(file_path, encoding="utf-8") as file:
             data = json.load(file)
-
-            assert isinstance(data, list)
-
-            for fn in data:
-                assert isinstance(fn, dict)
-                assert isinstance(fn["parameters"], dict)
-
-                functions.append(
-                    Function(
-                        name=fn["name"],
-                        description=fn["description"],
-                        parameters=[
-                            Parameter(key=key, type_=value["type"])
-                            for key, value in fn["parameters"].items()
-                        ],
-                        returns=fn["returns"]["type"],
-                    )
-                )
-
     except OSError as e:
         raise Exception("File Error") from e
     except json.decoder.JSONDecodeError as e:
         raise Exception("JSON Error") from e
+
+    try:
+        type_adapter = TypeAdapter(list[dict[str, Any]])
+        type_adapter.validate_python(data)
+
+        for fn in data:
+            functions.append(FunctionModel(**fn))
+
     except (AssertionError, KeyError) as e:
         raise Exception("Key Error") from e
     except ValidationError as e:
