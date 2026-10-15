@@ -5,6 +5,10 @@ from pydantic import BaseModel, Field, ValidationError, TypeAdapter
 Type = Literal["string", "number"]
 
 
+class ParseError(Exception):
+    """Raised when a file cannot be read or its contents cannot be parsed."""
+
+
 class TypeModel(BaseModel):
     type_: Type = Field(alias="type")
 
@@ -23,9 +27,9 @@ def parse_functions(file_path: str) -> list[FunctionModel]:
         with open(file_path, encoding="utf-8") as file:
             data = json.load(file)
     except OSError as e:
-        raise Exception("File Error") from e
+        raise ParseError("Unable to open the specified file") from e
     except json.decoder.JSONDecodeError as e:
-        raise Exception("JSON Error") from e
+        raise ParseError("Could not parse the file as JSON") from e
 
     try:
         type_adapter = TypeAdapter(list[dict[str, Any]])
@@ -33,11 +37,8 @@ def parse_functions(file_path: str) -> list[FunctionModel]:
 
         for fn in data:
             functions.append(FunctionModel(**fn))
-
-    except (AssertionError, KeyError) as e:
-        raise Exception("Key Error") from e
     except ValidationError as e:
-        raise Exception("Invalid Data") from e
+        raise ParseError("Invalid data structure") from e
 
     return functions
 
