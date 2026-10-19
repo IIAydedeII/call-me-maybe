@@ -1,14 +1,19 @@
 from llm_sdk import Small_LLM_Model, torch
 from collections import deque
+from .functions import parse_functions, ParseError
 
 
-def iterate_prompt() -> None:
-    PROMPT = "Slim Shady is one of the most influential figures that exist in fiction."
+def iterate_prompt(prompt: str) -> None:
+    enhanced_prompt = (
+        prompt
+        + "\nPick one of these functions above"
+        + " that roots the square and show in JSON format:"
+    )
     ITERATION = 420
 
     model = Small_LLM_Model()
     # response = ""
-    token_ids_tensor = model.encode(PROMPT)
+    token_ids_tensor = model.encode(enhanced_prompt)
     token_ids: list[int] = token_ids_tensor.flatten().tolist()
     queue_length = len(token_ids) * 2
 
@@ -19,7 +24,7 @@ def iterate_prompt() -> None:
     print("Type:", token_ids_tensor.dtype)
     print("Device:", token_ids_tensor.device)
     print("-" * 10)
-    print(PROMPT)
+    print(enhanced_prompt)
     print()
 
     input_ids = deque(token_ids, maxlen=queue_length)
@@ -38,7 +43,13 @@ def iterate_prompt() -> None:
 
 
 def main() -> None:
-    iterate_prompt()
+    try:
+        functions_definition = parse_functions(
+            "./data/input/functions_definition.json"
+        )
+        iterate_prompt(str(functions_definition))
+    except ParseError as e:
+        print("Error:", e)
 
 
 if __name__ == "__main__":

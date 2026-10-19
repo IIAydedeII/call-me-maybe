@@ -12,6 +12,9 @@ class ParseError(Exception):
 class TypeModel(BaseModel):
     type_: Type = Field(alias="type")
 
+    def __repr__(self) -> str:
+        return f"{{type: '{self.type_}'}}"
+
 
 class FunctionModel(BaseModel):
     name: str = Field(min_length=1)
