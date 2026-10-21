@@ -1,8 +1,9 @@
+import sys
 from llm_sdk import Small_LLM_Model, torch
 from collections import deque
-from .functions import parse_functions, ParseError, FunctionModel
+from .functions import parse_functions, ParseError, FunctionModel, JSONType
 
-PROMPT = 'Replace all numbers in "Hello 34 I\'m 233 years old" with NUMBERS'
+PROMPT = "Substitute the word 'cat' with 'dog' in 'The cat sat on the mat with another cat'"
 MODEL = Small_LLM_Model()
 
 
@@ -47,7 +48,7 @@ def iterate_prompt(prompt: str) -> None:
 def choose_function_from_list(
     functions: list[FunctionModel],
 ) -> FunctionModel | None:
-    ITERATION = 10
+    ITERATION = 42
     FUNCTION_NAMES = [fn.name for fn in functions]
 
     result = ""
@@ -101,19 +102,95 @@ def choose_function_from_list(
     return next((fn for fn in functions if fn.name == result), None)
 
 
+def generate_parameters(fn: FunctionModel) -> dict[str, str]:
+    parameters: dict[str, str] = {key: "" for key in fn.parameters}
+
+    for parameter, type_model in fn.parameters.items():
+        result = ""
+        enhanced_prompt = "\n".join(
+            [
+                repr(fn),
+                "",
+                f"request: {PROMPT}",
+                (
+                    ""
+                    if all([not v for v in parameters.values()])
+                    else f"\nChosen values: {parameters}"
+                ),
+                "",
+                f"The value for the '{parameter}' parameter of this function for the given request is ",
+            ]
+        )
+
+        print()
+        print(f"Prompt:\n'{enhanced_prompt}'")
+        print()
+        print(f"Asking for the parameter '{parameter}'")
+
+        ITERATION = 42
+
+        token_ids_tensor = MODEL.encode(enhanced_prompt + '"')
+        token_ids: list[int] = token_ids_tensor.flatten().tolist()
+        input_ids = token_ids
+        for _ in range(ITERATION):
+            logits = MODEL.get_logits_from_input_ids(input_ids)
+
+            for token_id, logit in enumerate(logits):
+                potential_token = MODEL.decode([token_id])
+
+                if potential_token.endswith('"'):
+                    break
+
+                try:
+                    match type_model.json_type:
+                        case JSONType.NUMBER:
+                            float(result + potential_token)
+                        case JSONType.INTEGER:
+                            int(result + potential_token)
+                        case JSONType.BOOLEAN:
+                            bool(result + potential_token)
+                        case JSONType.STRING:
+                            if '"' in potential_token:
+                                raise ValueError
+                except ValueError:
+                    logits[token_id] = float("-inf")
+
+            next_token_id = max(range(len(logits)), key=lambda i: logits[i])
+            next_token = MODEL.decode([next_token_id])
+
+            print(f"Checking '{next_token}'")
+
+            if '"' in next_token:
+                break
+
+            result += next_token
+            input_ids.append(next_token_id)
+
+        parameters[parameter] = result
+
+    return parameters
+
+
 def main() -> None:
     try:
         functions_definition = parse_functions(
             "./data/input/functions_definition.json"
         )
         # iterate_prompt(str(functions_definition))
+    except ParseError as e:
+        print("Error:", e, file=sys.stderr)
+        sys.exit(1)
 
-        function_chosen = choose_function_from_list(functions_definition)
+    function_chosen = choose_function_from_list(functions_definition)
+
+    print()
+    print("The chosen function is:", repr(function_chosen))
+
+    if function_chosen:
+        parameters = generate_parameters(function_chosen)
 
         print()
-        print("The chosen function is:", repr(function_chosen))
-    except ParseError as e:
-        print("Error:", e)
+        print("The chosen parameters are:", parameters)
 
 
 if __name__ == "__main__":
