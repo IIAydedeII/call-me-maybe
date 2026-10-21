@@ -2,6 +2,7 @@ import sys
 from llm_sdk import Small_LLM_Model, torch
 from collections import deque
 from .functions import parse_functions, ParseError, FunctionModel, JSONType
+from .output import output_json, FunctionCall, OutputError
 
 PROMPT = "Substitute the word 'cat' with 'dog' in 'The cat sat on the mat with another cat'"
 MODEL = Small_LLM_Model()
@@ -63,8 +64,8 @@ def choose_function_from_list(
         ]
     )
 
-    print()
-    print(f"Prompt:\n'{enhanced_prompt}'")
+    # print()
+    # print(f"Prompt:\n'{enhanced_prompt}'")
     print()
     print("Asking for the function name")
 
@@ -122,8 +123,8 @@ def generate_parameters(fn: FunctionModel) -> dict[str, str]:
             ]
         )
 
-        print()
-        print(f"Prompt:\n'{enhanced_prompt}'")
+        # print()
+        # print(f"Prompt:\n'{enhanced_prompt}'")
         print()
         print(f"Asking for the parameter '{parameter}'")
 
@@ -181,16 +182,32 @@ def main() -> None:
         print("Error:", e, file=sys.stderr)
         sys.exit(1)
 
-    function_chosen = choose_function_from_list(functions_definition)
+    function_calls: list[FunctionCall] = []
 
+    function_chosen = choose_function_from_list(functions_definition)
     print()
     print("The chosen function is:", repr(function_chosen))
 
-    if function_chosen:
-        parameters = generate_parameters(function_chosen)
+    if not function_chosen:
+        print("Error: Could not chose a function.", file=sys.stderr)
+        sys.exit(1)
 
+    parameters = generate_parameters(function_chosen)
+    print()
+    print("The chosen parameters are:", parameters)
+
+    function_calls.append(
+        FunctionCall(PROMPT, function_chosen.name, parameters=parameters)
+    )
+
+    try:
+        output_json("./data/output/function_calls.json", function_calls)
+    except OutputError as e:
+        print("Error:", e, file=sys.stderr)
+        sys.exit(1)
+    else:
         print()
-        print("The chosen parameters are:", parameters)
+        print("Successfully dumped the function calls.")
 
 
 if __name__ == "__main__":
