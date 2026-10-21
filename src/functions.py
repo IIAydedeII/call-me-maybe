@@ -1,8 +1,14 @@
 import json
-from typing import Literal, Any
+from typing import Any
+from enum import StrEnum, auto
 from pydantic import BaseModel, Field, ValidationError, TypeAdapter
 
-Type = Literal["string", "number"]
+
+class JSONType(StrEnum):
+    STRING = auto()
+    BOOLEAN = auto()
+    INTEGER = auto()
+    NUMBER = auto()
 
 
 class ParseError(Exception):
@@ -10,10 +16,10 @@ class ParseError(Exception):
 
 
 class TypeModel(BaseModel):
-    type_: Type = Field(alias="type")
+    json_type: JSONType = Field(alias="type")
 
     def __repr__(self) -> str:
-        return f"{{type: '{self.type_}'}}"
+        return f"{{type: '{self.json_type}'}}"
 
 
 class FunctionModel(BaseModel):
