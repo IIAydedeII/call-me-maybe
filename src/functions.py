@@ -1,35 +1,10 @@
 from typing import TypeVar
-from enum import StrEnum, auto
-from pydantic import BaseModel, Field, ValidationError, TypeAdapter
-
-
-class JSONType(StrEnum):
-    STRING = auto()
-    BOOLEAN = auto()
-    INTEGER = auto()
-    NUMBER = auto()
+from pydantic import BaseModel, ValidationError, TypeAdapter
+from .models import FunctionModel, PromptModel
 
 
 class ParseError(Exception):
     """Raised when a file cannot be read or its contents cannot be parsed."""
-
-
-class TypeModel(BaseModel):
-    json_type: JSONType = Field(alias="type")
-
-    def __repr__(self) -> str:
-        return f"{{type: '{self.json_type}'}}"
-
-
-class FunctionModel(BaseModel):
-    name: str = Field(min_length=1)
-    description: str
-    parameters: dict[str, TypeModel]
-    returns: TypeModel
-
-
-class PromptModel(BaseModel):
-    prompt: str
 
 
 T = TypeVar("T", bound=BaseModel)

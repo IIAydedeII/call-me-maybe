@@ -1,13 +1,8 @@
 import sys
 from llm_sdk import Small_LLM_Model, torch
 from collections import deque
-from .functions import (
-    parse_model_list,
-    FunctionModel,
-    PromptModel,
-    ParseError,
-    JSONType,
-)
+from .functions import parse_model_list, ParseError
+from .models import FunctionModel, PromptModel, JSONType
 from .output import output_json, FunctionCall, OutputError
 
 MODEL = Small_LLM_Model()
