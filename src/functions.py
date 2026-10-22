@@ -1,3 +1,4 @@
+from typing import TypeVar
 from enum import StrEnum, auto
 from pydantic import BaseModel, Field, ValidationError, TypeAdapter
 
@@ -27,39 +28,37 @@ class FunctionModel(BaseModel):
     returns: TypeModel
 
 
-def parse_functions(file_path: str) -> list[FunctionModel]:
-    try:
-        with open(file_path, encoding="utf-8") as file:
-            adapter = TypeAdapter(list[FunctionModel])
-            functions = adapter.validate_json(file.read())
-    except OSError as e:
-        raise ParseError("Unable to open the specified file") from e
-    except ValidationError as e:
-        raise ParseError("Invalid data structure") from e
-
-    return functions
-
-
 class PromptModel(BaseModel):
     prompt: str
 
 
-def parse_prompts(file_path: str) -> list[str]:
+T = TypeVar("T", bound=BaseModel)
+
+
+def parse_model_list(file_path: str, model: type[T]) -> list[T]:
     try:
         with open(file_path, encoding="utf-8") as file:
-            adapter = TypeAdapter(list[PromptModel])
-            prompts = adapter.validate_json(file.read())
+            adapter = TypeAdapter(list[model])
+            models = adapter.validate_json(file.read())
     except OSError as e:
         raise ParseError("Unable to open the specified file") from e
     except ValidationError as e:
         raise ParseError("Invalid data structure") from e
 
-    return [item.prompt for item in prompts]
+    return models
 
 
 if __name__ == "__main__":
     print("Functions:")
-    print(parse_functions("./data/input/functions_definition.json"))
+    print(
+        parse_model_list(
+            "./data/input/functions_definition.json", FunctionModel
+        )
+    )
     print()
     print("Prompts:")
-    print(parse_prompts("./data/input/function_calling_tests.json"))
+    print(
+        parse_model_list(
+            "./data/input/function_calling_tests.json", PromptModel
+        )
+    )
