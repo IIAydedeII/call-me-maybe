@@ -1,10 +1,15 @@
 import sys
 from llm_sdk import Small_LLM_Model, torch
 from collections import deque
-from .functions import parse_functions, ParseError, FunctionModel, JSONType
+from .functions import (
+    parse_functions,
+    parse_prompts,
+    ParseError,
+    FunctionModel,
+    JSONType,
+)
 from .output import output_json, FunctionCall, OutputError
 
-PROMPT = "Substitute the word 'cat' with 'dog' in 'The cat sat on the mat with another cat'"
 MODEL = Small_LLM_Model()
 
 
@@ -48,6 +53,7 @@ def iterate_prompt(prompt: str) -> None:
 
 def choose_function_from_list(
     functions: list[FunctionModel],
+    prompt: str,
 ) -> FunctionModel | None:
     ITERATION = 42
     FUNCTION_NAMES = [fn.name for fn in functions]
@@ -57,7 +63,7 @@ def choose_function_from_list(
         [
             str(functions),
             "",
-            f"request: {PROMPT}",
+            f"request: {prompt}",
             "",
             "One of these functions' name above "
             + "to satisfy the given request is ",
@@ -89,7 +95,7 @@ def choose_function_from_list(
         next_token_id = max(range(len(logits)), key=lambda i: logits[i])
         next_token = MODEL.decode([next_token_id])
 
-        print(f"Checking '{next_token}'")
+        # print(f"Checking '{next_token}'")
 
         if not any(result + next_token in name for name in FUNCTION_NAMES):
             break
@@ -103,7 +109,7 @@ def choose_function_from_list(
     return next((fn for fn in functions if fn.name == result), None)
 
 
-def generate_parameters(fn: FunctionModel) -> dict[str, str]:
+def generate_parameters(fn: FunctionModel, prompt: str) -> dict[str, str]:
     parameters: dict[str, str] = {key: "" for key in fn.parameters}
 
     for parameter, type_model in fn.parameters.items():
@@ -112,7 +118,7 @@ def generate_parameters(fn: FunctionModel) -> dict[str, str]:
             [
                 repr(fn),
                 "",
-                f"request: {PROMPT}",
+                f"request: {prompt}",
                 (
                     ""
                     if all([not v for v in parameters.values()])
@@ -159,7 +165,7 @@ def generate_parameters(fn: FunctionModel) -> dict[str, str]:
             next_token_id = max(range(len(logits)), key=lambda i: logits[i])
             next_token = MODEL.decode([next_token_id])
 
-            print(f"Checking '{next_token}'")
+            # print(f"Checking '{next_token}'")
 
             if '"' in next_token:
                 break
@@ -177,28 +183,31 @@ def main() -> None:
         functions_definition = parse_functions(
             "./data/input/functions_definition.json"
         )
-        # iterate_prompt(str(functions_definition))
+        prompts = parse_prompts("./data/input/function_calling_tests.json")
     except ParseError as e:
         print("Error:", e, file=sys.stderr)
         sys.exit(1)
 
     function_calls: list[FunctionCall] = []
 
-    function_chosen = choose_function_from_list(functions_definition)
-    print()
-    print("The chosen function is:", repr(function_chosen))
+    for prompt in prompts:
+        function_chosen = choose_function_from_list(
+            functions_definition, prompt
+        )
+        print()
+        print("The chosen function is:", repr(function_chosen))
 
-    if not function_chosen:
-        print("Error: Could not chose a function.", file=sys.stderr)
-        sys.exit(1)
+        if not function_chosen:
+            print("Error: Could not chose a function.", file=sys.stderr)
+            sys.exit(1)
 
-    parameters = generate_parameters(function_chosen)
-    print()
-    print("The chosen parameters are:", parameters)
+        parameters = generate_parameters(function_chosen, prompt)
+        print()
+        print("The chosen parameters are:", parameters)
 
-    function_calls.append(
-        FunctionCall(PROMPT, function_chosen.name, parameters=parameters)
-    )
+        function_calls.append(
+            FunctionCall(prompt, function_chosen.name, parameters=parameters)
+        )
 
     try:
         output_json("./data/output/function_calls.json", function_calls)

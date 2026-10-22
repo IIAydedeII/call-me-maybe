@@ -40,5 +40,26 @@ def parse_functions(file_path: str) -> list[FunctionModel]:
     return functions
 
 
+class PromptModel(BaseModel):
+    prompt: str
+
+
+def parse_prompts(file_path: str) -> list[str]:
+    try:
+        with open(file_path, encoding="utf-8") as file:
+            adapter = TypeAdapter(list[PromptModel])
+            prompts = adapter.validate_json(file.read())
+    except OSError as e:
+        raise ParseError("Unable to open the specified file") from e
+    except ValidationError as e:
+        raise ParseError("Invalid data structure") from e
+
+    return [item.prompt for item in prompts]
+
+
 if __name__ == "__main__":
+    print("Functions:")
     print(parse_functions("./data/input/functions_definition.json"))
+    print()
+    print("Prompts:")
+    print(parse_prompts("./data/input/function_calling_tests.json"))
