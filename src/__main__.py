@@ -2,8 +2,8 @@ import sys
 from llm_sdk import Small_LLM_Model, torch
 from collections import deque
 from .functions import parse_model_list, ParseError
-from .models import FunctionModel, PromptModel, JSONType
-from .output import output_json, FunctionCall, OutputError
+from .models import FunctionModel, PromptModel, JSONType, FunctionCall
+from .output import output_model_list, OutputError
 
 MODEL = Small_LLM_Model()
 
@@ -205,11 +205,13 @@ def main() -> None:
         print("The chosen parameters are:", parameters)
 
         function_calls.append(
-            FunctionCall(prompt, function_chosen.name, parameters=parameters)
+            FunctionCall(
+                prompt=prompt, name=function_chosen.name, parameters=parameters
+            )
         )
 
     try:
-        output_json("./data/output/function_calls.json", function_calls)
+        output_model_list("./data/output/function_calls.json", function_calls)
     except OutputError as e:
         print("Error:", e, file=sys.stderr)
         sys.exit(1)

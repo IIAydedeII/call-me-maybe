@@ -25,3 +25,9 @@ class FunctionModel(BaseModel):
 
 class PromptModel(BaseModel):
     prompt: str
+
+
+class FunctionCall(BaseModel):
+    prompt: str
+    name: str
+    parameters: dict[str, str]
