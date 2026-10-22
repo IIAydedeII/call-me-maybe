@@ -1,7 +1,7 @@
 import sys
 from llm_sdk import Small_LLM_Model, torch
 from collections import deque
-from .input import input_model_list, ParseError
+from .input import input_model_list, InputError
 from .models import FunctionModel, PromptModel, JSONType, FunctionCall
 from .output import output_model_list, OutputError
 
@@ -181,7 +181,7 @@ def main() -> None:
         prompts = input_model_list(
             "./data/input/function_calling_tests.json", PromptModel
         )
-    except ParseError as e:
+    except InputError as e:
         print("Error:", e, file=sys.stderr)
         sys.exit(1)
 

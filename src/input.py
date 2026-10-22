@@ -3,7 +3,7 @@ from pydantic import BaseModel, ValidationError, TypeAdapter
 from .models import FunctionModel, PromptModel
 
 
-class ParseError(Exception):
+class InputError(Exception):
     """Raised when a file cannot be read or its contents cannot be parsed."""
 
 
@@ -16,9 +16,9 @@ def input_model_list(file_path: str, model: type[T]) -> list[T]:
             adapter = TypeAdapter(list[model])
             models = adapter.validate_json(file.read())
     except OSError as e:
-        raise ParseError("Unable to open the specified file") from e
+        raise InputError("Unable to open the specified file") from e
     except ValidationError as e:
-        raise ParseError("Invalid data structure") from e
+        raise InputError("Invalid data structure") from e
 
     return models
 
