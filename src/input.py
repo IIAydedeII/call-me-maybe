@@ -10,7 +10,7 @@ class ParseError(Exception):
 T = TypeVar("T", bound=BaseModel)
 
 
-def parse_model_list(file_path: str, model: type[T]) -> list[T]:
+def input_model_list(file_path: str, model: type[T]) -> list[T]:
     try:
         with open(file_path, encoding="utf-8") as file:
             adapter = TypeAdapter(list[model])
@@ -26,14 +26,14 @@ def parse_model_list(file_path: str, model: type[T]) -> list[T]:
 if __name__ == "__main__":
     print("Functions:")
     print(
-        parse_model_list(
+        input_model_list(
             "./data/input/functions_definition.json", FunctionModel
         )
     )
     print()
     print("Prompts:")
     print(
-        parse_model_list(
+        input_model_list(
             "./data/input/function_calling_tests.json", PromptModel
         )
     )

@@ -1,7 +1,7 @@
 import sys
 from llm_sdk import Small_LLM_Model, torch
 from collections import deque
-from .functions import parse_model_list, ParseError
+from .input import input_model_list, ParseError
 from .models import FunctionModel, PromptModel, JSONType, FunctionCall
 from .output import output_model_list, OutputError
 
@@ -175,10 +175,10 @@ def generate_parameters(fn: FunctionModel, prompt: str) -> dict[str, str]:
 
 def main() -> None:
     try:
-        functions_definition = parse_model_list(
+        functions_definition = input_model_list(
             "./data/input/functions_definition.json", FunctionModel
         )
-        prompts = parse_model_list(
+        prompts = input_model_list(
             "./data/input/function_calling_tests.json", PromptModel
         )
     except ParseError as e:
