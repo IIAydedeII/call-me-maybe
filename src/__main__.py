@@ -66,11 +66,6 @@ def choose_function_from_list(
         ]
     )
 
-    # print()
-    # print(f"Prompt:\n'{enhanced_prompt}'")
-    print()
-    print("Asking for the function name")
-
     token_ids_tensor = MODEL.encode(enhanced_prompt)
     token_ids: list[int] = token_ids_tensor.flatten().tolist()
     input_ids = token_ids
@@ -99,8 +94,8 @@ def choose_function_from_list(
         result += next_token
         input_ids.append(next_token_id)
 
-    print()
-    print(f"Looking for '{result}'")
+    # print()
+    # print(f"Looking for '{result}' in the function definitions")
 
     return next((fn for fn in functions if fn.name == result), None)
 
@@ -125,9 +120,6 @@ def generate_parameters(fn: FunctionModel, prompt: str) -> dict[str, str]:
             ]
         )
 
-        # print()
-        # print(f"Prompt:\n'{enhanced_prompt}'")
-        print()
         print(f"Asking for the parameter '{parameter}'")
 
         ITERATION = 42
@@ -192,9 +184,15 @@ def main() -> None:
     for item in prompts:
         prompt = item.prompt
 
+        print()
+        print("-" * 42)
+        print("Asking for a function name for the prompt:")
+        print(f"'{prompt}'")
+
         function_chosen = choose_function_from_list(
             functions_definition, prompt
         )
+
         print()
         print("The chosen function is:", repr(function_chosen))
 
@@ -202,9 +200,14 @@ def main() -> None:
             print("Error: Could not chose a function.", file=sys.stderr)
             sys.exit(1)
 
+        print()
+        print(
+            f"Asking for the parameters of the function '{function_chosen.name}'"
+        )
+
         parameters = generate_parameters(function_chosen, prompt)
         print()
-        print("The chosen parameters are:", parameters)
+        print("The generated values are:", parameters)
 
         function_calls.append(
             FunctionCall(
@@ -219,7 +222,7 @@ def main() -> None:
         sys.exit(1)
     else:
         print()
-        print("Successfully dumped the function calls.")
+        print(f"Successfully dumped the function calls to '{args.output}'")
 
 
 if __name__ == "__main__":
