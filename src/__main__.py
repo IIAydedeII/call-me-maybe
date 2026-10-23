@@ -1,50 +1,11 @@
 import sys
 from llm_sdk import Small_LLM_Model, torch
-from collections import deque
 from .arguments import build_parser
 from .input import input_model_list, InputError
 from .models import FunctionModel, PromptModel, JSONType, FunctionCall
 from .output import output_model_list, OutputError
 
 MODEL = Small_LLM_Model()
-
-
-def iterate_prompt(prompt: str) -> None:
-    enhanced_prompt = (
-        prompt
-        + "\nPick one of these functions above"
-        + " that roots the square and show in JSON format:"
-    )
-    ITERATION = 420
-
-    # response = ""
-    token_ids_tensor = MODEL.encode(enhanced_prompt)
-    token_ids: list[int] = token_ids_tensor.flatten().tolist()
-    queue_length = len(token_ids) * 2
-
-    print()
-    print("Iteration Count:", ITERATION)
-    print("Queue Length:", queue_length)
-    print("-" * 10)
-    print("Type:", token_ids_tensor.dtype)
-    print("Device:", token_ids_tensor.device)
-    print("-" * 10)
-    print(enhanced_prompt)
-    print()
-
-    input_ids = deque(token_ids, maxlen=queue_length)
-
-    for _ in range(ITERATION):
-        logits = MODEL.get_logits_from_input_ids(input_ids)
-        next_token_id = max(range(len(logits)), key=lambda i: logits[i])
-        decoded = MODEL.decode([next_token_id])
-        print(decoded, end="", flush=True)
-
-        # response += decoded
-        input_ids.append(next_token_id)
-
-    # print()
-    # print(f"Response:\n{response}")
 
 
 def choose_function_from_list(
