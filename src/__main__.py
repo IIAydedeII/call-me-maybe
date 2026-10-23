@@ -1,18 +1,18 @@
 import sys
+from collections.abc import Generator
 from llm_sdk import Small_LLM_Model, torch
 from .arguments import build_parser
 from .input import input_model_list, InputError
 from .models import FunctionModel, PromptModel, JSONType, FunctionCall
 from .output import output_model_list, OutputError
 
+MAX_ITERATION = 42
 MODEL = Small_LLM_Model()
 
 
-def choose_function_from_list(
-    functions: list[FunctionModel],
-    prompt: str,
-) -> FunctionModel | None:
-    ITERATION = 42
+def generate_function_name(
+    functions: list[FunctionModel], prompt: str
+) -> Generator[str]:
     FUNCTION_NAMES = [fn.name for fn in functions]
 
     result = ""
@@ -30,7 +30,7 @@ def choose_function_from_list(
     token_ids_tensor = MODEL.encode(enhanced_prompt)
     token_ids: list[int] = token_ids_tensor.flatten().tolist()
     input_ids = token_ids
-    for _ in range(ITERATION):
+    for _ in range(MAX_ITERATION):
         logits = MODEL.get_logits_from_input_ids(input_ids)
 
         for token_id, logit in enumerate(logits):
@@ -52,79 +52,69 @@ def choose_function_from_list(
         if not any(result + next_token in name for name in FUNCTION_NAMES):
             break
 
+        yield next_token
         result += next_token
         input_ids.append(next_token_id)
 
-    # print()
-    # print(f"Looking for '{result}' in the function definitions")
 
-    return next((fn for fn in functions if fn.name == result), None)
+def generate_parameter(
+    fn: FunctionModel, prompt: str, parameter: str
+) -> Generator[str]:
 
+    result = ""
+    enhanced_prompt = "\n".join(
+        [
+            repr(fn),
+            "",
+            f"request: {prompt}",
+            (
+                ""
+                if all([not v for v in fn.parameters.values()])
+                else f"\nChosen values: {fn.parameters}"
+            ),
+            "",
+            f"The value for the '{parameter}' parameter of this function"
+            + " for the given request is ",
+        ]
+    )
 
-def generate_parameters(fn: FunctionModel, prompt: str) -> dict[str, str]:
-    parameters: dict[str, str] = {key: "" for key in fn.parameters}
+    token_ids_tensor = MODEL.encode(enhanced_prompt + '"')
+    token_ids: list[int] = token_ids_tensor.flatten().tolist()
+    input_ids = token_ids
+    for _ in range(MAX_ITERATION):
+        logits = MODEL.get_logits_from_input_ids(input_ids)
 
-    for parameter, type_model in fn.parameters.items():
-        result = ""
-        enhanced_prompt = "\n".join(
-            [
-                repr(fn),
-                "",
-                f"request: {prompt}",
-                (
-                    ""
-                    if all([not v for v in parameters.values()])
-                    else f"\nChosen values: {parameters}"
-                ),
-                "",
-                f"The value for the '{parameter}' parameter of this function for the given request is ",
-            ]
-        )
+        for token_id, logit in enumerate(logits):
+            potential_token = MODEL.decode([token_id])
 
-        print(f"Asking for the parameter '{parameter}'")
-
-        ITERATION = 42
-
-        token_ids_tensor = MODEL.encode(enhanced_prompt + '"')
-        token_ids: list[int] = token_ids_tensor.flatten().tolist()
-        input_ids = token_ids
-        for _ in range(ITERATION):
-            logits = MODEL.get_logits_from_input_ids(input_ids)
-
-            for token_id, logit in enumerate(logits):
-                potential_token = MODEL.decode([token_id])
-
-                if potential_token.endswith('"'):
-                    break
-
-                try:
-                    match type_model.json_type:
-                        case JSONType.NUMBER:
-                            float(result + potential_token)
-                        case JSONType.INTEGER:
-                            int(result + potential_token)
-                        case JSONType.BOOLEAN:
-                            bool(result + potential_token)
-                        case JSONType.STRING:
-                            if '"' in potential_token:
-                                raise ValueError
-                except ValueError:
-                    logits[token_id] = float("-inf")
-
-            next_token_id = max(range(len(logits)), key=lambda i: logits[i])
-            next_token = MODEL.decode([next_token_id])
-
-            # print(f"Checking '{next_token}'")
-
-            if '"' in next_token:
+            if potential_token.endswith('"'):
                 break
 
-            result += next_token
-            input_ids.append(next_token_id)
+            try:
+                match fn.parameters[parameter].json_type:
+                    case JSONType.NUMBER:
+                        float(result + potential_token)
+                    case JSONType.INTEGER:
+                        int(result + potential_token)
+                    case JSONType.BOOLEAN:
+                        bool(result + potential_token)
+                    case JSONType.STRING:
+                        if '"' in potential_token:
+                            raise ValueError
+            except ValueError:
+                logits[token_id] = float("-inf")
 
-        parameters[parameter] = result
+        next_token_id = max(range(len(logits)), key=lambda i: logits[i])
+        next_token = MODEL.decode([next_token_id])
 
-    return parameters
+        # print(f"Checking '{next_token}'")
+
+        if '"' in next_token:
+            break
+
+        yield next_token
+        result += next_token
+        input_ids.append(next_token_id)
 
 
 def main() -> None:
@@ -147,11 +137,21 @@ def main() -> None:
 
         print()
         print("-" * 42)
-        print("Asking for a function name for the prompt:")
+        print("With the prompt:")
         print(f"'{prompt}'")
+        print()
+        print("Asking for a function name:")
 
-        function_chosen = choose_function_from_list(
-            functions_definition, prompt
+        generated_name = ""
+        print("'", end="", flush=True)
+        for token in generate_function_name(functions_definition, prompt):
+            print(token, end="", flush=True)
+            generated_name += token
+        print("'")
+
+        function_chosen = next(
+            (fn for fn in functions_definition if fn.name == generated_name),
+            None,
         )
 
         print()
@@ -163,10 +163,24 @@ def main() -> None:
 
         print()
         print(
-            f"Asking for the parameters of the function '{function_chosen.name}'"
+            f"Asking for the parameters of the function '{function_chosen.name}':"
         )
 
-        parameters = generate_parameters(function_chosen, prompt)
+        parameters: dict[str, str] = {}
+
+        for parameter in function_chosen.parameters:
+            print(f"'{parameter}': ", end="", flush=True)
+
+            generated_value = ""
+            print("'", end="", flush=True)
+            for token in generate_parameter(
+                function_chosen, prompt, parameter
+            ):
+                print(token, end="", flush=True)
+                generated_value += token
+            print("'")
+            parameters.update({parameter: generated_value})
+
         print()
         print("The generated values are:", parameters)
 
