@@ -1,5 +1,6 @@
 import sys
 from collections.abc import Generator
+from typing import Any
 from llm_sdk import Small_LLM_Model, torch
 from .arguments import build_parser
 from .input import input_model_list, InputError
@@ -57,30 +58,10 @@ def generate_function_name(
         input_ids.append(next_token_id)
 
 
-def generate_parameter(
-    fn: FunctionModel, prompt: str, parameter: str
-) -> Generator[str]:
-
+def generate_parameter(prompt: str, json_type: JSONType) -> Generator[str]:
     result = ""
-    enhanced_prompt = "\n".join(
-        [
-            repr(fn),
-            "",
-            f"request: {prompt}",
-            (
-                ""
-                if all([not v for v in fn.parameters.values()])
-                else f"\nChosen values: {fn.parameters}"
-            ),
-            "",
-            f"The value for the '{parameter}' parameter of this function"
-            + " for the given request is ",
-        ]
-    )
 
-    token_ids_tensor = MODEL.encode(enhanced_prompt + '"')
-    token_ids: list[int] = token_ids_tensor.flatten().tolist()
-    input_ids = token_ids
+    input_ids = MODEL.encode(prompt + '"').flatten().tolist()
     for _ in range(MAX_ITERATION):
         logits = MODEL.get_logits_from_input_ids(input_ids)
 
@@ -91,7 +72,7 @@ def generate_parameter(
                 break
 
             try:
-                match fn.parameters[parameter].json_type:
+                match json_type:
                     case JSONType.NUMBER:
                         float(result + potential_token)
                     case JSONType.INTEGER:
@@ -115,6 +96,35 @@ def generate_parameter(
         yield next_token
         result += next_token
         input_ids.append(next_token_id)
+
+
+def generate_parameters(fn: FunctionModel, prompt: str) -> dict[str, Any]:
+    parameters: dict[str, Any] = {param: None for param in fn.parameters}
+
+    for parameter, type_model in fn.parameters.items():
+        enhanced_prompt = "\n".join(
+            [
+                repr(fn),
+                "",
+                f"\nCurrent values: {parameters}\n" if parameters else "",
+                f"Request: {prompt}",
+                f"The value for the '{parameter}' parameter of this function"
+                + " for the given request is ",
+            ]
+        )
+        print(f"'{parameter}': ", end="", flush=True)
+
+        generated_value = ""
+        print("'", end="", flush=True)
+        # if "with_regex" in fn.name:
+        #     print("\nPROMPT:", enhanced_prompt)
+        for token in generate_parameter(enhanced_prompt, type_model.json_type):
+            print(token, end="", flush=True)
+            generated_value += token
+        print("'")
+        parameters.update({parameter: generated_value})
+
+    return parameters
 
 
 def main() -> None:
@@ -166,20 +176,7 @@ def main() -> None:
             f"Asking for the parameters of the function '{function_chosen.name}':"
         )
 
-        parameters: dict[str, str] = {}
-
-        for parameter in function_chosen.parameters:
-            print(f"'{parameter}': ", end="", flush=True)
-
-            generated_value = ""
-            print("'", end="", flush=True)
-            for token in generate_parameter(
-                function_chosen, prompt, parameter
-            ):
-                print(token, end="", flush=True)
-                generated_value += token
-            print("'")
-            parameters.update({parameter: generated_value})
+        parameters = generate_parameters(function_chosen, prompt)
 
         print()
         print("The generated values are:", parameters)

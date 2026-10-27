@@ -1,3 +1,4 @@
+from typing import Any
 from enum import StrEnum, auto
 from pydantic import BaseModel, Field
 
@@ -30,4 +31,4 @@ class PromptModel(BaseModel):
 class FunctionCall(BaseModel):
     prompt: str
     name: str
-    parameters: dict[str, str]
+    parameters: dict[str, Any]
