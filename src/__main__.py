@@ -121,6 +121,16 @@ def generate_parameters(fn: FunctionModel, prompt: str) -> dict[str, Any]:
             print(token, end="", flush=True)
             generated_value += token
         print("'")
+
+        match type_model.json_type:
+            case JSONType.NUMBER:
+                generated_value = float(generated_value)
+            case JSONType.INTEGER:
+                generated_value = int(generated_value)
+            case JSONType.BOOLEAN:
+                generated_value = bool(generated_value)
+            case JSONType.STRING:
+                pass
         parameters.update({parameter: generated_value})
 
     return parameters
