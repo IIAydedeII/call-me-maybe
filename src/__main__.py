@@ -28,9 +28,7 @@ def generate_function_name(
         ]
     )
 
-    token_ids_tensor = MODEL.encode(enhanced_prompt)
-    token_ids: list[int] = token_ids_tensor.flatten().tolist()
-    input_ids = token_ids
+    input_ids = MODEL.encode(enhanced_prompt).flatten().tolist()
     for _ in range(MAX_ITERATION):
         logits = MODEL.get_logits_from_input_ids(input_ids)
 
@@ -69,7 +67,7 @@ def generate_parameter(prompt: str, json_type: JSONType) -> Generator[str]:
             potential_token = MODEL.decode([token_id])
 
             if potential_token.endswith('"'):
-                break
+                continue
 
             try:
                 match json_type:
@@ -80,8 +78,7 @@ def generate_parameter(prompt: str, json_type: JSONType) -> Generator[str]:
                     case JSONType.BOOLEAN:
                         bool(result + potential_token)
                     case JSONType.STRING:
-                        if '"' in potential_token:
-                            raise ValueError
+                        pass
             except ValueError:
                 logits[token_id] = float("-inf")
 
@@ -91,6 +88,8 @@ def generate_parameter(prompt: str, json_type: JSONType) -> Generator[str]:
         # print(f"Checking '{next_token}'")
 
         if '"' in next_token:
+            next_token = next_token[: next_token.find('"')]
+            yield next_token
             break
 
         yield next_token
