@@ -39,7 +39,15 @@ install:
 	@uv sync
 
 run:
-	@uv run ${PYTHON} -m ${SRC}
+	@uv run ${PYTHON} -O -m ${SRC}
+
+limit:
+	@systemd-run --user --scope \
+  	--property MemoryMax=4G \
+  	nice --adjustment=19 uv run ${PYTHON} -m ${SRC}
+
+moulinette:
+	export UV_PROJECT_ENVIRONMENT = ($$UV_PROJECT_ENVIRONMENT)_moulinette
 
 debug:
 	@printf "${INVERSE}${YELLOW}Running in DEBUG mode${RESET}\n"
@@ -65,8 +73,8 @@ lint:
 lint-strict:
 	@printf "${GREEN}${BOLD}Linting${RESET}\n"
 	@printf "${GREEN}Syntax ${CYAN}(flake8)${RESET}\n"
-	@uv run flake8 ${SRC} || true
+	@uv run python3 -m flake8 ${SRC} || true
 	@printf "${GREEN}Typing ${CYAN}(mypy ${RED}--strict${CYAN})${RESET}\n"
-	@uv run mypy ${SRC} --strict || true
+	@uv run python3 -m mypy ${SRC} --strict || true
 
 .PHONY: install run debug clean lint lint-strict

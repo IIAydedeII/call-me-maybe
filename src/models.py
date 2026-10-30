@@ -11,10 +11,10 @@ class JSONType(StrEnum):
 
 
 class TypeModel(BaseModel):
-    json_type: JSONType = Field(alias="type")
+    type: JSONType = Field(alias="type")
 
     def __repr__(self) -> str:
-        return f"{{type: '{self.json_type}'}}"
+        return f"{{type: '{self.type}'}}"
 
 
 class FunctionModel(BaseModel):
