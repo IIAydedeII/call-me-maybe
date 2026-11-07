@@ -1,3 +1,4 @@
+import json
 import sys
 from collections.abc import Generator
 from typing import Any
@@ -149,77 +150,76 @@ def generate_function_name(
 def generate_parameter(prompt: str, json_type: JSONType) -> Generator[str]:
     result = ""
 
-    input_ids = MODEL.encode(f"{prompt}").flatten().tolist()
+    input_ids = MODEL.encode(prompt + '"').flatten().tolist()
     for _ in range(MAX_ITERATION):
         logits = MODEL.get_logits_from_input_ids(input_ids)
         STOP_TOKENS = {ControlToken.IM_END, ControlToken.EOS}
         IGNORE_TOKENS = {ControlToken.think, ControlToken.think_end}
 
         for token_id, logit in enumerate(logits):
-            # if token_id in STOP_TOKENS:
-            #     print("END:", logit)
             potential_token = control_decode(MODEL, token_id)
 
-            if result and token_id in STOP_TOKENS:
-                continue
+            # if result and token_id in STOP_TOKENS:
+            #     continue
 
-            if token_id in IGNORE_TOKENS:
-                continue
+            # if token_id in IGNORE_TOKENS:
+            #     continue
 
-            # logits[151643] = float("-inf")
-            # logits[151667] = float("-inf")
-            # logits[151666] = float("-inf")
-            # logits[151668] = float("-inf")
-
-            # if not potential_token:
-            #     logits[token_id] = float("-inf")
             # if potential_token.endswith('"'):
             #     continue
 
+            if '"' in potential_token:
+                continue
+
             try:
+                if not result and not '"' in potential_token:
+                    raise ValueError
+                if not potential_token:
+                    raise ValueError
+
                 match json_type:
                     case JSONType.NUMBER:
                         # if potential_token.strip() != potential_token:
                         #     raise ValueError
-                        float(potential_token)
+                        float(result + potential_token)
                     case JSONType.INTEGER:
                         # if potential_token.strip() != potential_token:
                         #     raise ValueError
-                        int(potential_token)
+                        int(result + potential_token)
                     case JSONType.BOOLEAN:
                         # if potential_token.strip() != potential_token:
                         #     raise ValueError
-                        bool(potential_token)
+                        bool(result + potential_token)
                     case JSONType.STRING:
-                        pass
+                        if (
+                            '"' in potential_token
+                            and not '\\"' in potential_token
+                        ):
+                            raise ValueError
             except ValueError:
                 logits[token_id] = float("-inf")
 
         next_token_id = max(range(len(logits)), key=lambda i: logits[i])
         next_token = control_decode(MODEL, next_token_id)
-        # print(f"\n'{next_token_id:6}':", logits[next_token_id])
-        # for id in STOP_TOKENS:
-        #     print(f"'{id}':", logits[id])
-
-        # print(f"Checking '{next_token}'")
         # breakpoint()
 
-        if next_token_id in STOP_TOKENS:
-            break
-        # if '"' in next_token:
-        #     next_token = next_token[: next_token.find('"')]
-        #     yield next_token
+        if not result and '"' in next_token:
+            result += next_token
+            next_token = next_token[: next_token.find('"')]
+            input_ids.append(next_token_id)
+            continue
+
+        # if next_token_id in STOP_TOKENS:
         #     break
+
+        if result and '"' in next_token and not '\\"' in next_token:
+            yield next_token[: next_token.rfind('"')]
+            break
+
+        yield next_token
 
         result += next_token
         input_ids.append(next_token_id)
-        if not any(
-            [
-                next_token_id in IGNORE_TOKENS,
-                # not next_token.strip(),
-            ]
-        ):
-            yield next_token
 
 
 def generate_parameters(fn: FunctionModel, prompt: str) -> dict[str, Any]:
@@ -229,21 +229,22 @@ def generate_parameters(fn: FunctionModel, prompt: str) -> dict[str, Any]:
         prompt_system = "\n".join(
             [
                 "<|im_start|>system",
-                "/no_think "
+                # "/no_think "
                 f"The function to use is: {fn.model_dump_json()}.",
                 f"Current values are: {parameters}" if parameters else "",
                 # f"End your answer with '<|endoftext|>'",
-                f"Pick a value for the '{parameter}' parameter of this function for the user's request.",
+                f"Pick a value for the '{parameter}' parameter of this function "
+                + "for the user's request in JSON format.",
                 # "Wrap the value you picked in double quotes.",
                 "<|im_end|>",
             ]
         )
-        prompt_user = f"<|im_start|>user\n{prompt}<|im_end|>"
+        prompt_user = f"<|im_start|>user\n{json.dumps(prompt)}<|im_end|>"
         enhanced_prompt = "\n".join(
             [
                 prompt_system,
                 prompt_user,
-                f'<|im_start|>tool\n<think>\n\n</think>\n{{"{parameter}":',
+                f'<|im_start|>assistant\n<think>\n\n</think>\n{{"{parameter}": ',
                 # f"<|im_start|>tool\n",
             ]
         )
@@ -253,22 +254,21 @@ def generate_parameters(fn: FunctionModel, prompt: str) -> dict[str, Any]:
 
         generated_value = ""
         print("'", end="", flush=True)
-        # if "with_regex" in fn.name:
-        #     print("\nPROMPT:", enhanced_prompt)
         for token in generate_parameter(enhanced_prompt, type_model.type):
             print(token, end="", flush=True)
             generated_value += token
         print("'")
 
-        # match type_model.type:
-        #     case JSONType.NUMBER:
-        #         generated_value = float(generated_value)
-        #     case JSONType.INTEGER:
-        #         generated_value = int(generated_value)
-        #     case JSONType.BOOLEAN:
-        #         generated_value = bool(generated_value)
-        #     case JSONType.STRING:
-        #         pass
+        match type_model.type:
+            case JSONType.NUMBER:
+                generated_value = float(generated_value)
+            case JSONType.INTEGER:
+                generated_value = int(generated_value)
+            case JSONType.BOOLEAN:
+                generated_value = bool(generated_value)
+            case JSONType.STRING:
+                generated_value = json.loads(f'"{generated_value}"')
+
         parameters.update({parameter: generated_value})
 
     return parameters
@@ -296,8 +296,8 @@ def main() -> None:
         print("-" * 42)
         print("With the prompt:")
         print(f"'{prompt}'")
-        # print()
-        # print("Asking for a function name:")
+        print()
+        print("Asking for a function name:")
 
         generated_name = ""
         print("'", end="", flush=True)
@@ -311,22 +311,22 @@ def main() -> None:
             None,
         )
 
-        # print()
-        # print("The chosen function is:", repr(function_chosen))
+        print()
+        print("The chosen function is:", repr(function_chosen))
 
         if not function_chosen:
             print("Error: Could not chose a function.", file=sys.stderr)
             sys.exit(1)
 
-        # print()
-        # print(
-        #     f"Asking for the parameters of the function '{function_chosen.name}':"
-        # )
+        print()
+        print(
+            f"Asking for the parameters of the function '{function_chosen.name}':"
+        )
 
         parameters = generate_parameters(function_chosen, prompt)
 
-        # print()
-        # print("The generated values are:", parameters)
+        print()
+        print("The generated values are:", parameters)
 
         function_calls.append(
             FunctionCall(
