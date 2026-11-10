@@ -1,7 +1,8 @@
 import sys
+import json
 from collections.abc import Generator
 from typing import Any
-from llm_sdk import Small_LLM_Model, torch
+from llm_sdk import Small_LLM_Model
 from .arguments import build_parser
 from .input import input_model_list, InputError
 from .models import FunctionModel, PromptModel, JSONType, FunctionCall
@@ -14,7 +15,7 @@ MODEL = Small_LLM_Model()
 def generate_function_name(
     functions: list[FunctionModel], prompt: str
 ) -> Generator[str]:
-    FUNCTION_NAMES = [fn.name for fn in functions]
+    function_names = [fn.name for fn in functions]
 
     result = ""
     enhanced_prompt = "\n".join(
@@ -29,6 +30,7 @@ def generate_function_name(
     )
 
     input_ids = MODEL.encode(enhanced_prompt).flatten().tolist()
+    logits: list[float] = []
     for _ in range(MAX_ITERATION):
         logits = MODEL.get_logits_from_input_ids(input_ids)
 
@@ -37,7 +39,7 @@ def generate_function_name(
 
             contains = potential_token and any(
                 name.startswith(result + potential_token)
-                for name in FUNCTION_NAMES
+                for name in function_names
             )
 
             if not contains:
@@ -48,7 +50,7 @@ def generate_function_name(
 
         # print(f"Checking '{next_token}'")
 
-        if not any(result + next_token in name for name in FUNCTION_NAMES):
+        if not any(result + next_token in name for name in function_names):
             break
 
         yield next_token
@@ -59,24 +61,35 @@ def generate_function_name(
 def generate_parameter(prompt: str, json_type: JSONType) -> Generator[str]:
     result = ""
 
-    input_ids = MODEL.encode(prompt + '"').flatten().tolist()
+    input_ids = MODEL.encode(prompt).flatten().tolist()
+    logits: list[float] = []
+    quote_open = False
     for _ in range(MAX_ITERATION):
         logits = MODEL.get_logits_from_input_ids(input_ids)
 
         for token_id, logit in enumerate(logits):
             potential_token = MODEL.decode([token_id])
 
-            if potential_token.endswith('"'):
+            # Allow/ignore all tokens with a double quote in them
+            if '"' in potential_token:
                 continue
 
             try:
+                # Ensure the first token contains a double quote
+                if not quote_open and not '"' in potential_token:
+                    raise ValueError
+                # Eliminate control tokens
+                if not potential_token:
+                    raise ValueError
+
+                potential_result = result + potential_token
                 match json_type:
                     case JSONType.NUMBER:
-                        float(result + potential_token)
+                        float(potential_result)
                     case JSONType.INTEGER:
-                        int(result + potential_token)
+                        int(potential_result)
                     case JSONType.BOOLEAN:
-                        bool(result + potential_token)
+                        bool(potential_result)
                     case JSONType.STRING:
                         pass
             except ValueError:
@@ -85,11 +98,18 @@ def generate_parameter(prompt: str, json_type: JSONType) -> Generator[str]:
         next_token_id = max(range(len(logits)), key=lambda i: logits[i])
         next_token = MODEL.decode([next_token_id])
 
-        # print(f"Checking '{next_token}'")
+        # breakpoint()
 
-        if '"' in next_token:
-            next_token = next_token[: next_token.find('"')]
-            yield next_token
+        if not quote_open and '"' in next_token:
+            quote_open = True
+
+            # Remove the part before the opening quote
+            quote_index = next_token.find('"')
+            next_token = next_token[quote_index + 1 :]
+
+        if quote_open and '"' in next_token and not '\\"' in next_token:
+            # Remove the part after the closing quote
+            yield next_token[: next_token.find('"')]
             break
 
         yield next_token
@@ -98,31 +118,39 @@ def generate_parameter(prompt: str, json_type: JSONType) -> Generator[str]:
 
 
 def generate_parameters(fn: FunctionModel, prompt: str) -> dict[str, Any]:
-    parameters: dict[str, Any] = {param: None for param in fn.parameters}
+    parameters: dict[str, Any] = {}
 
     for parameter, type_model in fn.parameters.items():
-        enhanced_prompt = "\n".join(
+        prompt_system = "\n".join(
             [
-                repr(fn),
-                "",
-                f"\nCurrent values: {parameters}\n" if parameters else "",
-                f"Request: {prompt}",
-                f"The value for the '{parameter}' parameter of this function"
-                + " for the given request is ",
+                "<|im_start|>system",
+                # "/no_think "
+                f"The function to use is: {fn.model_dump_json()}.",
+                f"Current values are: {parameters}" if parameters else "",
+                f"Pick a value for the '{parameter}' parameter of this function "
+                + "for the user's request in JSON format.",
+                "<|im_end|>",
             ]
         )
-        print(f"'{parameter}': ", end="", flush=True)
+        prompt_user = f"<|im_start|>user\n{json.dumps(prompt)}<|im_end|>"
+        enhanced_prompt = "\n".join(
+            [
+                prompt_system,
+                prompt_user,
+                f'<|im_start|>assistant\n<think>\n\n</think>\n{{"{parameter}": ',
+            ]
+        )
+
+        print(f"{parameter}: ", end="", flush=True)
 
         generated_value = ""
         print("'", end="", flush=True)
-        # if "with_regex" in fn.name:
-        #     print("\nPROMPT:", enhanced_prompt)
-        for token in generate_parameter(enhanced_prompt, type_model.json_type):
+        for token in generate_parameter(enhanced_prompt, type_model.type):
             print(token, end="", flush=True)
             generated_value += token
         print("'")
 
-        match type_model.json_type:
+        match type_model.type:
             case JSONType.NUMBER:
                 generated_value = float(generated_value)
             case JSONType.INTEGER:
@@ -130,7 +158,8 @@ def generate_parameters(fn: FunctionModel, prompt: str) -> dict[str, Any]:
             case JSONType.BOOLEAN:
                 generated_value = bool(generated_value)
             case JSONType.STRING:
-                pass
+                generated_value = json.loads(f'"{generated_value}"')
+
         parameters.update({parameter: generated_value})
 
     return parameters
@@ -155,11 +184,11 @@ def main() -> None:
         prompt = item.prompt
 
         print()
-        print("-" * 42)
+        print("—" * 42)
         print("With the prompt:")
         print(f"'{prompt}'")
         print()
-        print("Asking for a function name:")
+        print("Asking to pick a function:")
 
         generated_name = ""
         print("'", end="", flush=True)
@@ -173,14 +202,12 @@ def main() -> None:
             None,
         )
 
-        print()
-        print("The chosen function is:", repr(function_chosen))
-
         if not function_chosen:
             print("Error: Could not chose a function.", file=sys.stderr)
             sys.exit(1)
 
         print()
+        print("-" * 24)
         print(
             f"Asking for the parameters of the function '{function_chosen.name}':"
         )
