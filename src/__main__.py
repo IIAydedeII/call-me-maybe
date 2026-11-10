@@ -150,7 +150,7 @@ def generate_function_name(
 def generate_parameter(prompt: str, json_type: JSONType) -> Generator[str]:
     result = ""
 
-    input_ids = MODEL.encode(prompt + '"').flatten().tolist()
+    input_ids = MODEL.encode(prompt).flatten().tolist()
     for _ in range(MAX_ITERATION):
         logits = MODEL.get_logits_from_input_ids(input_ids)
         STOP_TOKENS = {ControlToken.IM_END, ControlToken.EOS}
@@ -181,15 +181,15 @@ def generate_parameter(prompt: str, json_type: JSONType) -> Generator[str]:
                     case JSONType.NUMBER:
                         # if potential_token.strip() != potential_token:
                         #     raise ValueError
-                        float(result + potential_token)
+                        float(result[1:] + potential_token)
                     case JSONType.INTEGER:
                         # if potential_token.strip() != potential_token:
                         #     raise ValueError
-                        int(result + potential_token)
+                        int(result[1:] + potential_token)
                     case JSONType.BOOLEAN:
                         # if potential_token.strip() != potential_token:
                         #     raise ValueError
-                        bool(result + potential_token)
+                        bool(result[1:] + potential_token)
                     case JSONType.STRING:
                         if (
                             '"' in potential_token
@@ -204,8 +204,9 @@ def generate_parameter(prompt: str, json_type: JSONType) -> Generator[str]:
         # breakpoint()
 
         if not result and '"' in next_token:
+            next_token = next_token[next_token.find('"') :]
+            yield next_token[next_token.find('"') + 1 :]
             result += next_token
-            next_token = next_token[: next_token.find('"')]
             input_ids.append(next_token_id)
             continue
 
