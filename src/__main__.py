@@ -126,19 +126,24 @@ def generate_parameters(fn: FunctionModel, prompt: str) -> dict[str, Any]:
                 "<|im_start|>system",
                 # "/no_think "
                 f"The function to use is: {fn.model_dump_json()}.",
-                f"Current values are: {parameters}" if parameters else "",
                 f"Pick a value for the '{parameter}' parameter of this function "
-                + "for the user's request in JSON format.",
+                + "for the user's request in JSON format",
                 "<|im_end|>",
             ]
         )
-        prompt_user = f"<|im_start|>user\n{json.dumps(prompt)}<|im_end|>"
-        enhanced_prompt = "\n".join(
+        prompt_user = f"<|im_start|>user\n{json.dumps(prompt)[1:-1]}<|im_end|>"
+        prompt_assistant = "\n".join(
             [
-                prompt_system,
-                prompt_user,
-                f'<|im_start|>assistant\n<think>\n\n</think>\n{{"{parameter}": ',
+                f"<|im_start|>assistant",
+                (
+                    f'{json.dumps(parameters)[:-1]}, "{parameter}": '
+                    if parameters
+                    else f'{{"{parameter}": '
+                ),
             ]
+        )
+        enhanced_prompt = "\n".join(
+            [prompt_system, prompt_user, prompt_assistant]
         )
 
         print(f"{parameter}: ", end="", flush=True)
