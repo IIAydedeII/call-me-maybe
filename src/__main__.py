@@ -92,8 +92,8 @@ def generate_parameter(prompt: str, json_type: JSONType) -> Generator[str]:
                     case JSONType.BOOLEAN:
                         bool(potential_result)
                     case JSONType.STRING:
-                        pass
-            except ValueError:
+                        json.loads(f'"{potential_result}"')
+            except (ValueError, json.decoder.JSONDecodeError):
                 logits[token_id] = float("-inf")
 
         next_token_id = max(range(len(logits)), key=lambda i: logits[i])
