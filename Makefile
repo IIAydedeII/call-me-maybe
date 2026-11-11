@@ -41,6 +41,12 @@ install:
 run:
 	@uv run ${PYTHON} -m ${SRC}
 
+limit:
+	@systemd-run --user --scope \
+  	--property MemoryMax=3G \
+  	nice --adjustment=19 \
+	uv run ${PYTHON} -m ${SRC}
+
 debug:
 	@printf "${INVERSE}${YELLOW}Running in DEBUG mode${RESET}\n"
 	@uv run ${PYTHON} -m pdb -m ${SRC}
@@ -69,4 +75,4 @@ lint-strict:
 	@printf "${GREEN}Typing ${CYAN}(mypy ${RED}--strict${CYAN})${RESET}\n"
 	@uv run mypy ${SRC} --strict || true
 
-.PHONY: install run debug clean lint lint-strict
+.PHONY: install run limit debug clean lint lint-strict
