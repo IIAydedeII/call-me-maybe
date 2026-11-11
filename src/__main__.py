@@ -18,16 +18,17 @@ def generate_function_name(
     function_names = [fn.name for fn in functions]
 
     result = ""
-    enhanced_prompt = "\n".join(
+    prompt_system = "\n".join(
         [
-            str(functions),
-            "",
-            f"request: {prompt}",
-            "",
-            "One of these functions' name above "
-            + "to satisfy the given request is ",
+            "<|im_start|>system",
+            f"Pick one of these functions that satisfies the user's request:",
+            f"{str(functions)}",
+            "<|im_end|>",
         ]
     )
+    prompt_user = f"<|im_start|>user\n{json.dumps(prompt)}<|im_end|>"
+    prompt_assistant = f"<|im_start|>assistant\n"
+    enhanced_prompt = "\n".join([prompt_system, prompt_user, prompt_assistant])
 
     input_ids = MODEL.encode(enhanced_prompt).flatten().tolist()
     logits: list[float] = []
