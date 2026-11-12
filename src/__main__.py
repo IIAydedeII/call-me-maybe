@@ -2,104 +2,70 @@ import sys
 import json
 from collections.abc import Generator
 from typing import Any
-from llm_sdk import Small_LLM_Model
 from .arguments import build_parser
 from .input import input_model_list, InputError
 from .models import FunctionModel, PromptModel, JSONType, FunctionCall
-from .utils import build_prompt
+from .utils import build_prompt, cast_value, generate_tokens
 from .output import output_model_list, OutputError
-
-MAX_ITERATION = 42
-MODEL = Small_LLM_Model()
 
 
 def generate_function_name(
     functions: list[FunctionModel], prompt: str
 ) -> Generator[str]:
-    function_names = [fn.name for fn in functions]
-
+    result = ""
     enhanced_prompt = build_prompt(
         "Pick one of these functions that satisfies the user's request:\n"
         + str(functions),
         json.dumps(prompt),
     )
 
-    result = ""
-    input_ids = MODEL.encode(enhanced_prompt).flatten().tolist()
-    for _ in range(MAX_ITERATION):
-        logits = MODEL.get_logits_from_input_ids(input_ids)
+    def is_valid(token: str) -> bool:
+        function_names = [fn.name for fn in functions]
 
-        for token_id, logit in enumerate(logits):
-            token = MODEL.decode([token_id])
+        return bool(token) and any(
+            name.startswith(result + token) for name in function_names
+        )
 
-            contains = token and any(
-                name.startswith(result + token) for name in function_names
-            )
-
-            if not contains:
-                logits[token_id] = float("-inf")
-
-        next_token_id = logits.index(max(logits))
-        next_token = MODEL.decode([next_token_id])
-
-        if not any(
-            name.startswith(result + next_token) for name in function_names
-        ):
-            break
-
-        yield next_token
-        result += next_token
-        input_ids.append(next_token_id)
+    for token in generate_tokens(enhanced_prompt, is_valid):
+        result += token
+        yield token
 
 
 def generate_parameter(prompt: str, json_type: JSONType) -> Generator[str]:
+    result = ""
     quote_open = False
 
-    result = ""
-    input_ids = MODEL.encode(prompt).flatten().tolist()
-    for _ in range(MAX_ITERATION):
-        logits = MODEL.get_logits_from_input_ids(input_ids)
+    def is_valid(token: str) -> bool:
+        # Allow/ignore all tokens with a double quote in them
+        if not token or '"' in token:
+            return True
 
-        for token_id, logit in enumerate(logits):
-            token = MODEL.decode([token_id])
+        # Ensure the first token contains a double quote
+        if not quote_open and '"' not in token:
+            return False
 
-            # Allow/ignore all tokens with a double quote in them
-            if '"' in token:
-                continue
+        try:
+            cast_value(result + token, json_type)
+            return True
+        except (ValueError, json.decoder.JSONDecodeError):
+            return False
 
-            try:
-                # Ensure the first token contains a double quote
-                if not quote_open and not '"' in token:
-                    raise ValueError
-                # Eliminate control tokens
-                if not token:
-                    raise ValueError
-
-                potential_result = result + token
-                cast_value(potential_result, json_type)
-            except (ValueError, json.decoder.JSONDecodeError):
-                logits[token_id] = float("-inf")
-
-        next_token_id = logits.index(max(logits))
-        next_token = MODEL.decode([next_token_id])
-
+    for token in generate_tokens(prompt, is_valid):
         # breakpoint()
 
-        if not quote_open and '"' in next_token:
+        if not quote_open and '"' in token:
             quote_open = True
 
             # Remove the part before the opening quote
-            quote_index = next_token.find('"')
-            next_token = next_token[quote_index + 1 :]
+            token = token.split('"', 1)[1]
 
-        if quote_open and '"' in next_token and not '\\"' in next_token:
+        if quote_open and '"' in token and '\\"' not in token:
             # Remove the part after the closing quote
-            yield next_token[: next_token.find('"')]
+            yield token.split('"', 1)[0]
             break
 
-        yield next_token
-        result += next_token
-        input_ids.append(next_token_id)
+        result += token
+        yield token
 
 
 def generate_parameters(fn: FunctionModel, prompt: str) -> dict[str, Any]:
@@ -181,7 +147,8 @@ def main() -> None:
         print()
         print("-" * 24)
         print(
-            f"Asking for the parameters of the function '{function_chosen.name}':"
+            "Asking for the parameters of the function",
+            f"'{function_chosen.name}':",
         )
 
         parameters = generate_parameters(function_chosen, prompt)
