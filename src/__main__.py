@@ -4,16 +4,22 @@ from collections.abc import Generator
 from typing import Any
 from .arguments import build_parser
 from .input import input_model_list, InputError
-from .models import FunctionModel, PromptModel, JSONType, FunctionCall
-from .utils import build_prompt, cast_value, generate_tokens
+from .models import (
+    FunctionModel,
+    PromptModel,
+    JSONType,
+    FunctionCall,
+    EnhancedPrompt,
+)
+from .utils import cast_value, ModelOperator
 from .output import output_model_list, OutputError
 
 
 def generate_function_name(
-    functions: list[FunctionModel], prompt: str
+    model: ModelOperator, functions: list[FunctionModel], prompt: str
 ) -> Generator[str]:
     result = ""
-    enhanced_prompt = build_prompt(
+    enhanced_prompt = EnhancedPrompt(
         "Pick one of these functions that satisfies the user's request:\n"
         + str(functions),
         json.dumps(prompt),
@@ -26,12 +32,14 @@ def generate_function_name(
             name.startswith(result + token) for name in function_names
         )
 
-    for token in generate_tokens(enhanced_prompt, is_valid):
+    for token in model.generate_tokens(enhanced_prompt, is_valid):
         result += token
         yield token
 
 
-def generate_parameter(prompt: str, json_type: JSONType) -> Generator[str]:
+def generate_parameter(
+    model: ModelOperator, prompt: EnhancedPrompt, json_type: JSONType
+) -> Generator[str]:
     result = ""
     quote_open = False
 
@@ -50,7 +58,7 @@ def generate_parameter(prompt: str, json_type: JSONType) -> Generator[str]:
         except (ValueError, json.decoder.JSONDecodeError):
             return False
 
-    for token in generate_tokens(prompt, is_valid):
+    for token in model.generate_tokens(prompt, is_valid):
         # breakpoint()
 
         if not quote_open and '"' in token:
@@ -68,7 +76,9 @@ def generate_parameter(prompt: str, json_type: JSONType) -> Generator[str]:
         yield token
 
 
-def generate_parameters(fn: FunctionModel, prompt: str) -> dict[str, Any]:
+def generate_parameters(
+    model: ModelOperator, fn: FunctionModel, prompt: str
+) -> dict[str, Any]:
     parameters: dict[str, Any] = {}
 
     for parameter, type_model in fn.parameters.items():
@@ -83,7 +93,7 @@ def generate_parameters(fn: FunctionModel, prompt: str) -> dict[str, Any]:
             if parameters
             else f'{{"{parameter}": '
         )
-        enhanced_prompt = build_prompt(
+        enhanced_prompt = EnhancedPrompt(
             system, json.dumps(prompt)[1:-1], assistant
         )
 
@@ -91,7 +101,9 @@ def generate_parameters(fn: FunctionModel, prompt: str) -> dict[str, Any]:
 
         generated_value = ""
         print("'", end="", flush=True)
-        for token in generate_parameter(enhanced_prompt, type_model.type):
+        for token in generate_parameter(
+            model, enhanced_prompt, type_model.type
+        ):
             print(token, end="", flush=True)
             generated_value += token
         print("'")
@@ -116,6 +128,7 @@ def main() -> None:
         print("Error:", e, file=sys.stderr)
         sys.exit(1)
 
+    model_operator = ModelOperator()
     function_calls: list[FunctionCall] = []
 
     for item in prompts:
@@ -130,7 +143,9 @@ def main() -> None:
 
         generated_name = ""
         print("'", end="", flush=True)
-        for token in generate_function_name(functions_definition, prompt):
+        for token in generate_function_name(
+            model_operator, functions_definition, prompt
+        ):
             print(token, end="", flush=True)
             generated_name += token
         print("'")
@@ -151,7 +166,9 @@ def main() -> None:
             f"'{function_chosen.name}':",
         )
 
-        parameters = generate_parameters(function_chosen, prompt)
+        parameters = generate_parameters(
+            model_operator, function_chosen, prompt
+        )
 
         print()
         print("The generated values are:", parameters)

@@ -32,3 +32,19 @@ class FunctionCall(BaseModel):
     prompt: str
     name: str
     parameters: dict[str, Any]
+
+
+class EnhancedPrompt(str):
+    def __new__(cls, system: str, user: str, assistant: str = ""):
+        value = "\n".join(
+            [
+                "<|im_start|>system",
+                f"{system}<|im_end|>",
+                "<|im_start|>user",
+                f"{user}<|im_end|>",
+                "<|im_start|>assistant",
+                assistant,
+            ]
+        )
+
+        return super().__new__(cls, value)
