@@ -6,6 +6,7 @@ from llm_sdk import Small_LLM_Model
 from .arguments import build_parser
 from .input import input_model_list, InputError
 from .models import FunctionModel, PromptModel, JSONType, FunctionCall
+from .utils import build_prompt
 from .output import output_model_list, OutputError
 
 MAX_ITERATION = 42
@@ -17,41 +18,33 @@ def generate_function_name(
 ) -> Generator[str]:
     function_names = [fn.name for fn in functions]
 
-    result = ""
-    prompt_system = "\n".join(
-        [
-            "<|im_start|>system",
-            f"Pick one of these functions that satisfies the user's request:",
-            f"{str(functions)}",
-            "<|im_end|>",
-        ]
+    enhanced_prompt = build_prompt(
+        "Pick one of these functions that satisfies the user's request:\n"
+        + str(functions),
+        json.dumps(prompt),
     )
-    prompt_user = f"<|im_start|>user\n{json.dumps(prompt)}<|im_end|>"
-    prompt_assistant = f"<|im_start|>assistant\n"
-    enhanced_prompt = "\n".join([prompt_system, prompt_user, prompt_assistant])
 
+    result = ""
     input_ids = MODEL.encode(enhanced_prompt).flatten().tolist()
-    logits: list[float] = []
     for _ in range(MAX_ITERATION):
         logits = MODEL.get_logits_from_input_ids(input_ids)
 
         for token_id, logit in enumerate(logits):
-            potential_token = MODEL.decode([token_id])
+            token = MODEL.decode([token_id])
 
-            contains = potential_token and any(
-                name.startswith(result + potential_token)
-                for name in function_names
+            contains = token and any(
+                name.startswith(result + token) for name in function_names
             )
 
             if not contains:
                 logits[token_id] = float("-inf")
 
-        next_token_id = max(range(len(logits)), key=lambda i: logits[i])
+        next_token_id = logits.index(max(logits))
         next_token = MODEL.decode([next_token_id])
 
-        # print(f"Checking '{next_token}'")
-
-        if not any(result + next_token in name for name in function_names):
+        if not any(
+            name.startswith(result + next_token) for name in function_names
+        ):
             break
 
         yield next_token
@@ -60,30 +53,29 @@ def generate_function_name(
 
 
 def generate_parameter(prompt: str, json_type: JSONType) -> Generator[str]:
-    result = ""
-
-    input_ids = MODEL.encode(prompt).flatten().tolist()
-    logits: list[float] = []
     quote_open = False
+
+    result = ""
+    input_ids = MODEL.encode(prompt).flatten().tolist()
     for _ in range(MAX_ITERATION):
         logits = MODEL.get_logits_from_input_ids(input_ids)
 
         for token_id, logit in enumerate(logits):
-            potential_token = MODEL.decode([token_id])
+            token = MODEL.decode([token_id])
 
             # Allow/ignore all tokens with a double quote in them
-            if '"' in potential_token:
+            if '"' in token:
                 continue
 
             try:
                 # Ensure the first token contains a double quote
-                if not quote_open and not '"' in potential_token:
+                if not quote_open and not '"' in token:
                     raise ValueError
                 # Eliminate control tokens
-                if not potential_token:
+                if not token:
                     raise ValueError
 
-                potential_result = result + potential_token
+                potential_result = result + token
                 match json_type:
                     case JSONType.NUMBER:
                         float(potential_result)
@@ -96,7 +88,7 @@ def generate_parameter(prompt: str, json_type: JSONType) -> Generator[str]:
             except (ValueError, json.decoder.JSONDecodeError):
                 logits[token_id] = float("-inf")
 
-        next_token_id = max(range(len(logits)), key=lambda i: logits[i])
+        next_token_id = logits.index(max(logits))
         next_token = MODEL.decode([next_token_id])
 
         # breakpoint()
@@ -122,29 +114,19 @@ def generate_parameters(fn: FunctionModel, prompt: str) -> dict[str, Any]:
     parameters: dict[str, Any] = {}
 
     for parameter, type_model in fn.parameters.items():
-        prompt_system = "\n".join(
-            [
-                "<|im_start|>system",
-                # "/no_think "
-                f"The function to use is: {fn.model_dump_json()}.",
-                f"Pick a value for the '{parameter}' parameter of this function "
-                + "for the user's request in JSON format",
-                "<|im_end|>",
-            ]
+        system = (
+            f"The function to use is: {fn.model_dump_json()}.\n"
+            f"Pick a value for the '{parameter}' parameter for the user's "
+            + "request in JSON format."
         )
-        prompt_user = f"<|im_start|>user\n{json.dumps(prompt)[1:-1]}<|im_end|>"
-        prompt_assistant = "\n".join(
-            [
-                f"<|im_start|>assistant",
-                (
-                    f'{json.dumps(parameters)[:-1]}, "{parameter}": '
-                    if parameters
-                    else f'{{"{parameter}": '
-                ),
-            ]
+
+        assistant = (
+            f'{json.dumps(parameters)[:-1]}, "{parameter}": '
+            if parameters
+            else f'{{"{parameter}": '
         )
-        enhanced_prompt = "\n".join(
-            [prompt_system, prompt_user, prompt_assistant]
+        enhanced_prompt = build_prompt(
+            system, json.dumps(prompt)[1:-1], assistant
         )
 
         print(f"{parameter}: ", end="", flush=True)
