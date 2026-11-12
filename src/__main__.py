@@ -16,23 +16,21 @@ from .output import output_model_list, OutputError
 
 
 def generate_function_name(
-    model: ModelOperator, functions: list[FunctionModel], prompt: str
+    model: ModelOperator,
+    prompt: EnhancedPrompt,
+    functions: list[FunctionModel],
 ) -> Generator[str]:
     result = ""
-    enhanced_prompt = EnhancedPrompt(
-        "Pick one of these functions that satisfies the user's request:\n"
-        + str(functions),
-        json.dumps(prompt),
-    )
+
+    function_names = [fn.name for fn in functions]
 
     def is_valid(token: str) -> bool:
-        function_names = [fn.name for fn in functions]
 
         return bool(token) and any(
             name.startswith(result + token) for name in function_names
         )
 
-    for token in model.generate_tokens(enhanced_prompt, is_valid):
+    for token in model.generate_tokens(prompt, is_valid):
         result += token
         yield token
 
@@ -76,8 +74,30 @@ def generate_parameter(
         yield token
 
 
-def generate_parameters(
-    model: ModelOperator, fn: FunctionModel, prompt: str
+def pick_function(
+    model: ModelOperator, prompt: str, functions: list[FunctionModel]
+) -> FunctionModel | None:
+
+    enhanced_prompt = EnhancedPrompt(
+        "Pick one of these functions that satisfies the user's request:\n"
+        + str(functions),
+        json.dumps(prompt),
+    )
+
+    generated_name = ""
+    print("'", end="", flush=True)
+    for token in generate_function_name(model, enhanced_prompt, functions):
+        print(token, end="", flush=True)
+        generated_name += token
+    print("'")
+
+    function_chosen = {fn.name: fn for fn in functions}.get(generated_name)
+
+    return function_chosen
+
+
+def pick_parameters(
+    model: ModelOperator, prompt: str, fn: FunctionModel
 ) -> dict[str, Any]:
     parameters: dict[str, Any] = {}
 
@@ -108,9 +128,7 @@ def generate_parameters(
             generated_value += token
         print("'")
 
-        generated_value = cast_value(generated_value, type_model.type)
-
-        parameters.update({parameter: generated_value})
+        parameters[parameter] = cast_value(generated_value, type_model.type)
 
     return parameters
 
@@ -141,18 +159,8 @@ def main() -> None:
         print()
         print("Asking to pick a function:")
 
-        generated_name = ""
-        print("'", end="", flush=True)
-        for token in generate_function_name(
-            model_operator, functions_definition, prompt
-        ):
-            print(token, end="", flush=True)
-            generated_name += token
-        print("'")
-
-        function_chosen = next(
-            (fn for fn in functions_definition if fn.name == generated_name),
-            None,
+        function_chosen = pick_function(
+            model_operator, prompt, functions_definition
         )
 
         if not function_chosen:
@@ -166,9 +174,7 @@ def main() -> None:
             f"'{function_chosen.name}':",
         )
 
-        parameters = generate_parameters(
-            model_operator, function_chosen, prompt
-        )
+        parameters = pick_parameters(model_operator, prompt, function_chosen)
 
         print()
         print("The generated values are:", parameters)
