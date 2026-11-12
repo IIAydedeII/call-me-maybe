@@ -76,15 +76,7 @@ def generate_parameter(prompt: str, json_type: JSONType) -> Generator[str]:
                     raise ValueError
 
                 potential_result = result + token
-                match json_type:
-                    case JSONType.NUMBER:
-                        float(potential_result)
-                    case JSONType.INTEGER:
-                        int(potential_result)
-                    case JSONType.BOOLEAN:
-                        bool(potential_result)
-                    case JSONType.STRING:
-                        json.loads(f'"{potential_result}"')
+                cast_value(potential_result, json_type)
             except (ValueError, json.decoder.JSONDecodeError):
                 logits[token_id] = float("-inf")
 
@@ -138,15 +130,7 @@ def generate_parameters(fn: FunctionModel, prompt: str) -> dict[str, Any]:
             generated_value += token
         print("'")
 
-        match type_model.type:
-            case JSONType.NUMBER:
-                generated_value = float(generated_value)
-            case JSONType.INTEGER:
-                generated_value = int(generated_value)
-            case JSONType.BOOLEAN:
-                generated_value = bool(generated_value)
-            case JSONType.STRING:
-                generated_value = json.loads(f'"{generated_value}"')
+        generated_value = cast_value(generated_value, type_model.type)
 
         parameters.update({parameter: generated_value})
 
