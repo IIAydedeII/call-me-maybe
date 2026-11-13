@@ -4,7 +4,6 @@ from .models import FunctionModel, JSONType, EnhancedPrompt
 from .utils import print_generator, cast_value, ModelOperator
 
 
-@print_generator
 def generate_function_name(
     model: ModelOperator,
     prompt: EnhancedPrompt,
@@ -22,7 +21,6 @@ def generate_function_name(
         yield token
 
 
-@print_generator
 def generate_parameter(
     model: ModelOperator, prompt: EnhancedPrompt, json_type: JSONType
 ) -> Generator[str]:

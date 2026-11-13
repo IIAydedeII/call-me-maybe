@@ -5,9 +5,11 @@ from .arguments import build_parser
 from .input import input_model_list, InputError
 from .models import FunctionModel, PromptModel, FunctionCall, EnhancedPrompt
 from .generators import generate_function_name, generate_parameter
-from .utils import cast_value, ModelOperator
+from .utils import cast_value, ModelOperator, print_generator
 from .output import output_model_list, OutputError
 
+generate_function_name = print_generator(generate_function_name)
+generate_parameter = print_generator(generate_parameter)
 
 def pick_function(
     model: ModelOperator, prompt: str, functions: list[FunctionModel]
