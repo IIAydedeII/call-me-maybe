@@ -1,5 +1,7 @@
 import sys
 import json
+import time
+from datetime import timedelta
 from typing import Any
 from .arguments import build_parser
 from .io import input_model_list, output_model_list
@@ -17,7 +19,7 @@ def pick_function(
     enhanced_prompt = EnhancedPrompt(
         "Pick one of these functions that satisfies the user's request:\n"
         + str(functions),
-        json.dumps(prompt),
+        json.dumps(prompt)[1:-1],
     )
 
     name = "".join(generate_function_name(model, enhanced_prompt, functions))
@@ -79,14 +81,15 @@ def main() -> None:
 
     print()
     print()
-    print("[ ITERATING THE PROMPTS ]")
+    print("[ PROCESSING THE PROMPTS ]")
     print("═" * 42)
+    start = time.perf_counter()
+
     function_calls: list[FunctionCall] = []
 
     for index, item in enumerate(prompts):
         prompt = item.prompt
 
-        print()
         print(f"[{index+1:-2}/{len(prompts):-2}]")
         print("─" * 42)
         print("With the prompt:")
@@ -103,13 +106,17 @@ def main() -> None:
         parameters = pick_parameters(model_operator, prompt, chosen_function)
 
         print()
-        print("The generated values are:", parameters)
+        print("The generated values are:", json.dumps(parameters))
+        print()
 
         function_calls.append(
             FunctionCall(
                 prompt=prompt, name=chosen_function.name, parameters=parameters
             )
         )
+
+    elapsed = time.perf_counter() - start
+    print("Processed the prompts in:", timedelta(seconds=elapsed))
 
     print()
     print()

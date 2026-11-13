@@ -69,6 +69,8 @@ class ModelOperator(Small_LLM_Model):
             token_id = logits.index(max(logits))
             token = self.decode([token_id])
 
+            # breakpoint()
+
             if not is_valid(token):
                 break
 

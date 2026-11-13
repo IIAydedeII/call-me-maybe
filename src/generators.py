@@ -45,8 +45,6 @@ def generate_parameter(
             return False
 
     for token in model.generate_tokens(prompt, is_valid):
-        # breakpoint()
-
         if not quote_open and '"' in token:
             quote_open = True
 
