@@ -11,10 +11,11 @@ from .models import (
     FunctionCall,
     EnhancedPrompt,
 )
-from .utils import cast_value, ModelOperator
+from .utils import print_generator, cast_value, ModelOperator
 from .output import output_model_list, OutputError
 
 
+@print_generator
 def generate_function_name(
     model: ModelOperator,
     prompt: EnhancedPrompt,
@@ -35,6 +36,7 @@ def generate_function_name(
         yield token
 
 
+@print_generator
 def generate_parameter(
     model: ModelOperator, prompt: EnhancedPrompt, json_type: JSONType
 ) -> Generator[str]:
@@ -84,12 +86,9 @@ def pick_function(
         json.dumps(prompt),
     )
 
-    generated_name = ""
-    print("'", end="", flush=True)
-    for token in generate_function_name(model, enhanced_prompt, functions):
-        print(token, end="", flush=True)
-        generated_name += token
-    print("'")
+    generated_name = "".join(
+        generate_function_name(model, enhanced_prompt, functions)
+    )
 
     function_chosen = {fn.name: fn for fn in functions}.get(generated_name)
 
@@ -113,20 +112,16 @@ def pick_parameters(
             if parameters
             else f'{{"{parameter}": '
         )
+
         enhanced_prompt = EnhancedPrompt(
             system, json.dumps(prompt)[1:-1], assistant
         )
 
         print(f"{parameter}: ", end="", flush=True)
 
-        generated_value = ""
-        print("'", end="", flush=True)
-        for token in generate_parameter(
-            model, enhanced_prompt, type_model.type
-        ):
-            print(token, end="", flush=True)
-            generated_value += token
-        print("'")
+        generated_value = "".join(
+            generate_parameter(model, enhanced_prompt, type_model.type)
+        )
 
         parameters[parameter] = cast_value(generated_value, type_model.type)
 

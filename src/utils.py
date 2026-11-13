@@ -1,8 +1,28 @@
 import json
-from typing import Any
+from typing import Any, ParamSpec
 from collections.abc import Generator, Callable
+from functools import wraps
 from llm_sdk import Small_LLM_Model
 from .models import JSONType, EnhancedPrompt
+
+P = ParamSpec("P")
+
+
+def print_generator(
+    func: Callable[P, Generator[str]],
+) -> Callable[P, Generator[str]]:
+    @wraps(func)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> Generator[str]:
+
+        print("'", end="", flush=True)
+
+        for token in func(*args, **kwargs):
+            print(token, end="", flush=True)
+            yield token
+
+        print("'")
+
+    return wrapper
 
 
 def cast_value(value: str, json_type: JSONType) -> Any:
