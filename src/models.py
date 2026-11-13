@@ -3,10 +3,6 @@ from enum import StrEnum, auto
 from pydantic import BaseModel, Field
 
 
-class AppError(Exception):
-    """Base exception for application-specific errors."""
-
-
 class JSONType(StrEnum):
     STRING = auto()
     BOOLEAN = auto()

@@ -3,15 +3,9 @@ import json
 from typing import Any
 from .arguments import build_parser
 from .io import input_model_list, output_model_list
-from .models import (
-    FunctionModel,
-    PromptModel,
-    FunctionCall,
-    EnhancedPrompt,
-    AppError,
-)
+from .models import FunctionModel, PromptModel, FunctionCall, EnhancedPrompt
 from .generators import generate_function_name, generate_parameter
-from .utils import cast_value, ModelOperator, print_generator
+from .utils import cast_value, ModelOperator, print_generator, AppError
 
 generate_function_name = print_generator(generate_function_name)
 generate_parameter = print_generator(generate_parameter)

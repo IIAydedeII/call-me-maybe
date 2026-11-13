@@ -3,7 +3,12 @@ from typing import Any, ParamSpec
 from collections.abc import Generator, Callable
 from functools import wraps
 from llm_sdk import Small_LLM_Model
-from .models import JSONType, EnhancedPrompt, AppError
+from .models import JSONType, EnhancedPrompt
+
+
+class AppError(Exception):
+    """Base exception for application-specific errors."""
+
 
 P = ParamSpec("P")
 

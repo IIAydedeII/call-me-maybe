@@ -1,7 +1,8 @@
 from pathlib import Path
 from typing import TypeVar
 from pydantic import BaseModel, ValidationError, TypeAdapter
-from .models import FunctionModel, PromptModel, AppError
+from .models import FunctionModel, PromptModel
+from .utils import AppError
 
 T = TypeVar("T", bound=BaseModel)
 
