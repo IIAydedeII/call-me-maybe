@@ -1,3 +1,5 @@
+"""Select functions and generate parameters from natural language prompts."""
+
 import sys
 import json
 import time
@@ -16,6 +18,19 @@ generate_parameter = print_generator(generate_parameter)
 def pick_function(
     model: ModelOperator, prompt: str, functions: list[FunctionModel]
 ) -> FunctionModel | None:
+    """Select the function that best matches a user's request.
+
+    Args:
+        model (ModelOperator):
+            The model operator used to generate the function name.
+        prompt (str): The user's natural language request.
+        functions (list[FunctionModel]):
+            The available function definitions to choose from.
+
+    Returns:
+        FunctionModel: The selected function definition, or None if the
+            generated function name does not match any available function.
+    """
     enhanced_prompt = EnhancedPrompt(
         "Pick one of these functions that satisfies the user's request:\n"
         + str(functions),
@@ -30,6 +45,20 @@ def pick_function(
 def pick_parameters(
     model: ModelOperator, prompt: str, fn: FunctionModel
 ) -> dict[str, Any]:
+    """Generate parameter values for a selected function.
+
+    Args:
+        model (ModelOperator):
+            The model operator used to generate parameter values.
+        prompt (str): The user's natural language request.
+        fn (FunctionModel):
+            The selected function definition containing parameter names and
+            their expected types.
+
+    Returns:
+        A dictionary mapping parameter names to their generated,
+        type-cast values.
+    """
     parameters: dict[str, Any] = {}
 
     user = json.dumps(prompt)[1:-1]
@@ -61,6 +90,11 @@ def pick_parameters(
 
 
 def main() -> None:
+    """Execute the function selection and parameter generation workflow.
+
+    Raises:
+        AppError: If no suitable function can be selected for a prompt.
+    """
     args_parser = build_parser()
     args = args_parser.parse_args()
 
