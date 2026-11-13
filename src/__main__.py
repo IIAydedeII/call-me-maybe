@@ -2,7 +2,7 @@ import sys
 import json
 from typing import Any
 from .arguments import build_parser
-from .input import input_model_list
+from .io import input_model_list, output_model_list
 from .models import (
     FunctionModel,
     PromptModel,
@@ -12,7 +12,6 @@ from .models import (
 )
 from .generators import generate_function_name, generate_parameter
 from .utils import cast_value, ModelOperator, print_generator
-from .output import output_model_list
 
 generate_function_name = print_generator(generate_function_name)
 generate_parameter = print_generator(generate_parameter)
