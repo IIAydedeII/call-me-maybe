@@ -1,9 +1,9 @@
 from typing import TypeVar
 from pydantic import BaseModel, ValidationError, TypeAdapter
-from .models import FunctionModel, PromptModel
+from .models import FunctionModel, PromptModel, AppError
 
 
-class InputError(Exception):
+class InputError(AppError):
     """Raised when a file cannot be read or its contents cannot be parsed."""
 
 

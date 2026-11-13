@@ -1,9 +1,10 @@
 from pathlib import Path
 from typing import TypeVar
 from pydantic import BaseModel, ValidationError, TypeAdapter
+from .models import AppError
 
 
-class OutputError(Exception):
+class OutputError(AppError):
     """Raised when the data cannot be written to the file in JSON format."""
 
 

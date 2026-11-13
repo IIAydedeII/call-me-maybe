@@ -2,14 +2,21 @@ import sys
 import json
 from typing import Any
 from .arguments import build_parser
-from .input import input_model_list, InputError
-from .models import FunctionModel, PromptModel, FunctionCall, EnhancedPrompt
+from .input import input_model_list
+from .models import (
+    FunctionModel,
+    PromptModel,
+    FunctionCall,
+    EnhancedPrompt,
+    AppError,
+)
 from .generators import generate_function_name, generate_parameter
 from .utils import cast_value, ModelOperator, print_generator
-from .output import output_model_list, OutputError
+from .output import output_model_list
 
 generate_function_name = print_generator(generate_function_name)
 generate_parameter = print_generator(generate_parameter)
+
 
 def pick_function(
     model: ModelOperator, prompt: str, functions: list[FunctionModel]
@@ -62,62 +69,62 @@ def main() -> None:
     args_parser = build_parser()
     args = args_parser.parse_args()
 
-    try:
-        functions_definition = input_model_list(
-            args.functions_definition, FunctionModel
-        )
-        prompts = input_model_list(args.input, PromptModel)
-    except InputError as e:
-        print("Error:", e, file=sys.stderr)
-        sys.exit(1)
+    print("[ IMPORTING ]")
+    print("═" * 42)
 
+    functions = input_model_list(args.functions_definition, FunctionModel)
+    print(len(functions), "function definitions imported")
+
+    prompts = input_model_list(args.input, PromptModel)
+    print(len(prompts), "prompts collected")
+
+    print()
+    print()
+    print("[ INITIALIZING THE MODEL ]")
+    print("═" * 42)
     model_operator = ModelOperator()
+
+    print()
+    print()
+    print("[ ITERATING THE PROMPTS ]")
+    print("═" * 42)
     function_calls: list[FunctionCall] = []
 
-    for item in prompts:
+    for index, item in enumerate(prompts):
         prompt = item.prompt
 
         print()
-        print("—" * 42)
+        print(f"[{index+1:-2}/{len(prompts):-2}]")
+        print("─" * 42)
         print("With the prompt:")
         print(f"'{prompt}'")
         print()
         print("Asking to pick a function:")
+        chosen_function = pick_function(model_operator, prompt, functions)
 
-        function_chosen = pick_function(
-            model_operator, prompt, functions_definition
-        )
-
-        if not function_chosen:
-            print("Error: Could not chose a function.", file=sys.stderr)
-            sys.exit(1)
+        if not chosen_function:
+            raise AppError("Could not choose a function.")
 
         print()
-        print("-" * 24)
-        print(
-            "Asking for the parameters of the function",
-            f"'{function_chosen.name}':",
-        )
-
-        parameters = pick_parameters(model_operator, prompt, function_chosen)
+        print("Asking for the parameters:")
+        parameters = pick_parameters(model_operator, prompt, chosen_function)
 
         print()
         print("The generated values are:", parameters)
 
         function_calls.append(
             FunctionCall(
-                prompt=prompt, name=function_chosen.name, parameters=parameters
+                prompt=prompt, name=chosen_function.name, parameters=parameters
             )
         )
 
-    try:
-        output_model_list(args.output, function_calls)
-    except OutputError as e:
-        print("Error:", e, file=sys.stderr)
-        sys.exit(1)
-    else:
-        print()
-        print(f"Successfully dumped the function calls to '{args.output}'")
+    print()
+    print()
+    print("[ OUTPUTTING ]")
+    print("═" * 42)
+    output_model_list(args.output, function_calls)
+
+    print(f"Successfully dumped the function calls to '{args.output}'")
 
 
 if __name__ == "__main__":
@@ -125,3 +132,6 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         pass
+    except AppError as e:
+        print("[ERROR]:", e, file=sys.stderr)
+        sys.exit(1)

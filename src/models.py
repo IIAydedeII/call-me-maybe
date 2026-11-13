@@ -1,6 +1,10 @@
-from typing import Any
+from typing import Any, Self
 from enum import StrEnum, auto
 from pydantic import BaseModel, Field
+
+
+class AppError(Exception):
+    """Base exception for application-specific errors."""
 
 
 class JSONType(StrEnum):
@@ -35,7 +39,7 @@ class FunctionCall(BaseModel):
 
 
 class EnhancedPrompt(str):
-    def __new__(cls, system: str, user: str, assistant: str = ""):
+    def __new__(cls, system: str, user: str, assistant: str = "") -> Self:
         value = "\n".join(
             [
                 "<|im_start|>system",

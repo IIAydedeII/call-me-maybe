@@ -1,7 +1,6 @@
-import json
 from collections.abc import Generator
 from .models import FunctionModel, JSONType, EnhancedPrompt
-from .utils import print_generator, cast_value, ModelOperator
+from .utils import cast_value, CastError, ModelOperator
 
 
 def generate_function_name(
@@ -42,7 +41,7 @@ def generate_parameter(
         try:
             cast_value(result + token, json_type)
             return True
-        except (ValueError, json.decoder.JSONDecodeError):
+        except CastError:
             return False
 
     for token in model.generate_tokens(prompt, is_valid):

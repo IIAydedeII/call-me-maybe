@@ -3,7 +3,7 @@ from typing import Any, ParamSpec
 from collections.abc import Generator, Callable
 from functools import wraps
 from llm_sdk import Small_LLM_Model
-from .models import JSONType, EnhancedPrompt
+from .models import JSONType, EnhancedPrompt, AppError
 
 P = ParamSpec("P")
 
@@ -25,16 +25,23 @@ def print_generator(
     return wrapper
 
 
+class CastError(AppError):
+    """Raised when the given value does not comply with the expected schema."""
+
+
 def cast_value(value: str, json_type: JSONType) -> Any:
-    match json_type:
-        case JSONType.NUMBER:
-            return float(value)
-        case JSONType.INTEGER:
-            return int(value)
-        case JSONType.BOOLEAN:
-            return bool(value)
-        case JSONType.STRING:
-            return json.loads(f'"{value}"')
+    try:
+        match json_type:
+            case JSONType.NUMBER:
+                return float(value)
+            case JSONType.INTEGER:
+                return int(value)
+            case JSONType.BOOLEAN:
+                return bool(value)
+            case JSONType.STRING:
+                return json.loads(f'"{value}"')
+    except (ValueError, json.decoder.JSONDecodeError) as e:
+        raise CastError("Could not cast the given value") from e
 
 
 class ModelOperator(Small_LLM_Model):
