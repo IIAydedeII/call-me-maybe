@@ -23,12 +23,9 @@ def generate_function_name(
 ) -> Generator[str]:
     result = ""
 
-    function_names = [fn.name for fn in functions]
-
     def is_valid(token: str) -> bool:
-
         return bool(token) and any(
-            name.startswith(result + token) for name in function_names
+            fn.name.startswith(result + token) for fn in functions
         )
 
     for token in model.generate_tokens(prompt, is_valid):
@@ -44,12 +41,15 @@ def generate_parameter(
     quote_open = False
 
     def is_valid(token: str) -> bool:
-        # Allow/ignore all tokens with a double quote in them
-        if not token or '"' in token:
+        if not token:
+            return False
+
+        # Allow all tokens with a double quote in them
+        if '"' in token:
             return True
 
-        # Ensure the first token contains a double quote
-        if not quote_open and '"' not in token:
+        # Ensure the first token contains only a double quote
+        if not quote_open:
             return False
 
         try:
@@ -79,26 +79,23 @@ def generate_parameter(
 def pick_function(
     model: ModelOperator, prompt: str, functions: list[FunctionModel]
 ) -> FunctionModel | None:
-
     enhanced_prompt = EnhancedPrompt(
         "Pick one of these functions that satisfies the user's request:\n"
         + str(functions),
         json.dumps(prompt),
     )
 
-    generated_name = "".join(
-        generate_function_name(model, enhanced_prompt, functions)
-    )
+    name = "".join(generate_function_name(model, enhanced_prompt, functions))
 
-    function_chosen = {fn.name: fn for fn in functions}.get(generated_name)
-
-    return function_chosen
+    return {fn.name: fn for fn in functions}.get(name)
 
 
 def pick_parameters(
     model: ModelOperator, prompt: str, fn: FunctionModel
 ) -> dict[str, Any]:
     parameters: dict[str, Any] = {}
+
+    user = json.dumps(prompt)[1:-1]
 
     for parameter, type_model in fn.parameters.items():
         system = (
@@ -113,17 +110,15 @@ def pick_parameters(
             else f'{{"{parameter}": '
         )
 
-        enhanced_prompt = EnhancedPrompt(
-            system, json.dumps(prompt)[1:-1], assistant
-        )
+        enhanced_prompt = EnhancedPrompt(system, user, assistant)
 
         print(f"{parameter}: ", end="", flush=True)
 
-        generated_value = "".join(
+        value = "".join(
             generate_parameter(model, enhanced_prompt, type_model.type)
         )
 
-        parameters[parameter] = cast_value(generated_value, type_model.type)
+        parameters[parameter] = cast_value(value, type_model.type)
 
     return parameters
 
