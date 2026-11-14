@@ -1,17 +1,18 @@
 """Define data models and prompt representations for function calling."""
 
-from typing import Any, Self
-from enum import StrEnum, auto
+from __future__ import annotations
+from typing import Any
+from enum import Enum
 from pydantic import BaseModel, Field
 
 
-class JSONType(StrEnum):
+class JSONType(str, Enum):
     """Represent supported JSON data types."""
 
-    STRING = auto()
-    BOOLEAN = auto()
-    INTEGER = auto()
-    NUMBER = auto()
+    STRING = "string"
+    BOOLEAN = "boolean"
+    INTEGER = "integer"
+    NUMBER = "number"
 
 
 class TypeModel(BaseModel):
@@ -81,7 +82,9 @@ class EnhancedPrompt(str):
     the model's chat format.
     """
 
-    def __new__(cls, system: str, user: str, assistant: str = "") -> Self:
+    def __new__(
+        cls, system: str, user: str, assistant: str = ""
+    ) -> EnhancedPrompt:
         """Construct a formatted conversational prompt.
 
         Combines the system instructions, user request, and optional
