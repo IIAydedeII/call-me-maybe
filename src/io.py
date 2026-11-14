@@ -45,7 +45,7 @@ class ModelError(AppError):
 T = TypeVar("T", bound=BaseModel)
 
 
-def input_model_list(file_path: str, model: type[T]) -> list[T]:
+def import_model_list(file_path: str, model: type[T]) -> list[T]:
     """Load and validate a list of models from a JSON file.
 
     Args:
@@ -68,12 +68,12 @@ def input_model_list(file_path: str, model: type[T]) -> list[T]:
     except OSError as e:
         raise AppError("Unable to open the specified file") from e
     except ValidationError as e:
-        raise ModelError("Invalid input data structure", e) from e
+        raise ModelError("Invalid data structure to import", e) from e
 
     return models
 
 
-def output_model_list(file_path: str, data: list[T]) -> None:
+def export_model_list(file_path: str, data: list[T]) -> None:
     """Validate and write a list of models to a JSON file.
 
     Creates any missing parent directories before writing the file.
@@ -101,20 +101,20 @@ def output_model_list(file_path: str, data: list[T]) -> None:
     except OSError as e:
         raise AppError("Unable to write to the specified file") from e
     except ValidationError as e:
-        raise ModelError("Invalid output data structure", e) from e
+        raise ModelError("Invalid data structure to export", e) from e
 
 
 if __name__ == "__main__":
     print("Functions:")
     print(
-        input_model_list(
+        import_model_list(
             "./data/input/functions_definition.json", FunctionModel
         )
     )
     print()
     print("Prompts:")
     print(
-        input_model_list(
+        import_model_list(
             "./data/input/function_calling_tests.json", PromptModel
         )
     )

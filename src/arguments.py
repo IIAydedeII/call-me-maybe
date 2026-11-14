@@ -36,7 +36,7 @@ def build_parser() -> ArgumentParser:
         "--output",
         type=Path,
         default=Path("data/output/function_calling_results.json"),
-        help="File to output the predicted usages to.",
+        help="File to export the predicted usages to.",
     )
 
     return parser

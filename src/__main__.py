@@ -6,7 +6,7 @@ import time
 from datetime import timedelta
 from typing import Any
 from .arguments import build_parser
-from .io import input_model_list, output_model_list
+from .io import import_model_list, export_model_list
 from .models import FunctionModel, PromptModel, FunctionCall, EnhancedPrompt
 from .generators import generate_function_name, generate_parameter
 from .utils import cast_value, ModelOperator, print_generator, AppError
@@ -101,10 +101,10 @@ def main() -> None:
     print("[ IMPORTING ]")
     print("═" * 42)
 
-    functions = input_model_list(args.functions_definition, FunctionModel)
+    functions = import_model_list(args.functions_definition, FunctionModel)
     print(len(functions), "function definitions imported")
 
-    prompts = input_model_list(args.input, PromptModel)
+    prompts = import_model_list(args.input, PromptModel)
     print(len(prompts), "prompts collected")
 
     print()
@@ -155,9 +155,9 @@ def main() -> None:
 
     print()
     print()
-    print("[ OUTPUTTING ]")
+    print("[ EXPORTING ]")
     print("═" * 42)
-    output_model_list(args.output, function_calls)
+    export_model_list(args.output, function_calls)
 
     print(f"Successfully dumped the function calls to '{args.output}'")
 
