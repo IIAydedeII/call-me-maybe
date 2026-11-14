@@ -30,7 +30,7 @@ STRIKE		:=	$(ESC)[9m
 # Compilation Targets
 # =========================================
 
-PYTHON	=	python3
+PYTHON	=	python
 SRC		=	src
 
 
@@ -58,9 +58,9 @@ clean:
 lint:
 	@printf "${GREEN}${BOLD}Linting${RESET}\n"
 	@printf "${GREEN}Syntax ${CYAN}(flake8)${RESET}\n"
-	@uv run flake8 ${SRC} || true
+	@uv run ${PYTHON} -m flake8 ${SRC} || true
 	@printf "${GREEN}Typing ${CYAN}(mypy)${RESET}\n"
-	@uv run mypy ${SRC} \
+	@uv run ${PYTHON} -m mypy ${SRC} \
 	--warn-return-any \
 	--warn-unused-ignores \
 	--ignore-missing-imports \
@@ -71,8 +71,8 @@ lint:
 lint-strict:
 	@printf "${GREEN}${BOLD}Linting${RESET}\n"
 	@printf "${GREEN}Syntax ${CYAN}(flake8)${RESET}\n"
-	@uv run flake8 ${SRC} || true
+	@uv run ${PYTHON} -m flake8 ${SRC} || true
 	@printf "${GREEN}Typing ${CYAN}(mypy ${RED}--strict${CYAN})${RESET}\n"
-	@uv run mypy ${SRC} --strict || true
+	@uv run ${PYTHON} -m mypy ${SRC} --strict || true
 
 .PHONY: install run limit debug clean lint lint-strict
