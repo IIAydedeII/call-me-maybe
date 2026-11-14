@@ -42,7 +42,11 @@ run:
 	@uv run ${PYTHON} -m ${SRC}
 
 limit:
-	@systemd-run --user --scope --property MemorySwapMax=512M \
+	@systemd-run --user --scope \
+  	--property MemoryHigh=2G \
+  	--property MemoryMax=3G \
+  	--property MemorySwapMax=512M \
+  	nice --adjustment=19 \
 	uv run ${PYTHON} -m ${SRC}
 
 debug:
