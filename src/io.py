@@ -6,6 +6,42 @@ from pydantic import BaseModel, ValidationError, TypeAdapter
 from .models import FunctionModel, PromptModel
 from .utils import AppError
 
+
+class ModelError(AppError):
+    """Invalid model configuration.
+
+    Attributes:
+        validation (ValidationError):
+            Stores the ValidationError object raised by 'pydantic'
+    """
+
+    def __init__(self, message: str, validation: ValidationError):
+        """Initializes a ModelError.
+
+        Args:
+            message (str):
+                A message describing the main problem.
+            validation (ValidationError):
+                ValidationError object raised by 'pydantic'
+        """
+        self.validation = validation
+        super().__init__(message)
+
+    def __str__(self) -> str:
+        errors = [
+            f"[{err['loc'][0]}] "
+            f"{'.'.join(str(loc).upper() for loc in err['loc'][1:])}"
+            f":\n\t{err['msg']}"
+            for err in self.validation.errors(
+                include_url=False,
+                include_input=False,
+                include_context=False,
+            )
+        ]
+
+        return "\n".join([super().__str__(), *errors])
+
+
 T = TypeVar("T", bound=BaseModel)
 
 
@@ -32,7 +68,7 @@ def input_model_list(file_path: str, model: type[T]) -> list[T]:
     except OSError as e:
         raise AppError("Unable to open the specified file") from e
     except ValidationError as e:
-        raise AppError("Invalid data structure") from e
+        raise ModelError("Invalid input data structure", e) from e
 
     return models
 
@@ -65,7 +101,7 @@ def output_model_list(file_path: str, data: list[T]) -> None:
     except OSError as e:
         raise AppError("Unable to write to the specified file") from e
     except ValidationError as e:
-        raise AppError("Invalid data structure") from e
+        raise ModelError("Invalid output data structure", e) from e
 
 
 if __name__ == "__main__":
