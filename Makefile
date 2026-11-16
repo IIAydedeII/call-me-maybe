@@ -43,8 +43,9 @@ run:
 
 limit:
 	@systemd-run --user --scope \
-  	--property MemoryHigh=2G \
-  	--property MemoryMax=3G \
+	--unit=cmm_limit \
+  	--property MemoryHigh=3G \
+  	--property MemoryMax=4G \
   	--property MemorySwapMax=512M \
   	nice --adjustment=19 \
 	uv run ${PYTHON} -m ${SRC}
