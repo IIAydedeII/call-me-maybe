@@ -151,7 +151,7 @@ def main() -> None:
 
     elapsed = time.perf_counter() - start
     print("═" * 42)
-    print("Processed the prompts in:", timedelta(seconds=elapsed))
+    print("Processed all the prompts in:", timedelta(seconds=elapsed))
 
     print()
     print()
