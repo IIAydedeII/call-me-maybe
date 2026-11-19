@@ -117,8 +117,6 @@ For **Functions Definition**, expected file structure is:
 
 ## Algorithm explanation
 
-Describe your constrained decoding approach in detail
-
 Language models generate text one token at a time. At each step, the model produces a _fitness_ distribution (_logits_) over all possible next tokens. Normally, you would sample from this distribution or pick the highest _fitness_ token. **Constrained decoding** intervenes in this process by modifying the _logits_ before token selection:
 
 1. The model produces _logits_ for all possible tokens.
@@ -128,13 +126,9 @@ Language models generate text one token at a time. At each step, the model produ
 
 ## Design decisions
 
-Explain key choices in your implementation
-
 To maintain both a valid JSON structure and a performant generation procedure, we delay the JSON encoding to the end of the pipeline. We ask the SLM only to pick a function name from the available pool and to generate some values for the parameters of that said function's definition. With that, we make sure that the JSON structure is not affected by the outcome of the SLM's response, thus providing 100% JSON validity.
 
 ## Performance analysis
-
-Discuss accuracy, speed, and reliability of your solution
 
 By asking only for the function name and the parameters, we skip asking for unnecessary tokens and we can keep the query prompt short. Function definitions are added to the query prompt only when asking the model to select a function, not when asking for prompts and vice versa.
 
@@ -142,15 +136,11 @@ We can then ensure that the JSON structure is reliable by modeling the data stru
 
 ## Challenges faced
 
-Document difficulties encountered and how you solved them
-
 The hardest problem I faced was deciding where the prompt should end, or what should serve as the prompt terminator. Since we don't ask for a complete JSON response, we can't use the closing parentheses as an end of prompt specifier. I was hesitant to use double quotes either, since I couldn't figure how can I differentiate between a response ending quote and a quote that is part of the response string.
 
 I was tempted to use _control tokens_ for a while and tested a whole variety of general purpose or special control tokens but it was more reliable to ask for parameters (especially string types) in JSON format in the end since the SLM is trained with it more regularly. It was easier to use _escaped double quotes_ (`\"`) as regular response quotes and any other quote as the prompt terminator.
 
 ## Testing strategy
-
-Describe how you validated your implementation
 
 I avoided modifying the prompt as much as possible because it has an unreliable influence over the resulting logit calculation.
 
@@ -161,8 +151,6 @@ Besides import/export tests, I inspected the max logit token that I get and the 
 I wish I had automated the testing pipeline. It would also have been easier if I had implemented the demo functions myself.
 
 ## Example usage
-
-Provide clear examples of running your program
 
 We provide our request inputs as follows:
 
