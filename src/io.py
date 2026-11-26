@@ -58,12 +58,14 @@ def import_model_list(file_path: str, model: type[T]) -> list[T]:
 
     Raises:
         AppError:
-            If the file cannot be opened or read or if the JSON data does not
-            match the expected model structure.
+            If the file cannot be opened or read.
+        ModelError:
+            If the JSON data does not match the expected model structure.
     """
+    adapter = TypeAdapter(list[model])  # type: ignore[valid-type]
+
     try:
         with open(file_path, encoding="utf-8") as file:
-            adapter = TypeAdapter(list[model])  # type: ignore[valid-type]
             models = adapter.validate_json(file.read())
     except OSError as e:
         raise AppError("Unable to open the specified file") from e
@@ -84,15 +86,17 @@ def export_model_list(file_path: str, data: list[T]) -> None:
 
     Raises:
         AppError:
-            If the file or its parent directories cannot be accessed or if the
-            provided data does not conform to its expected Pydantic model
-            structure.
+            If the file or its parent directories cannot be accessed.
+
+        ModelError:
+            If the provided data does not conform to its expected Pydantic
+            model structure.
     """
 
     path = Path(file_path)
+    adapter = TypeAdapter(list[T])
 
     try:
-        adapter = TypeAdapter(list[T])
         adapter.validate_python(data)
         json_data = adapter.dump_json(data, indent=4).decode("utf-8")
 
