@@ -63,7 +63,7 @@ def import_model_list(file_path: str, model: type[T]) -> list[T]:
     """
     try:
         with open(file_path, encoding="utf-8") as file:
-            adapter = TypeAdapter(list[model])
+            adapter = TypeAdapter(list[model])  # type: ignore[valid-type]
             models = adapter.validate_json(file.read())
     except OSError as e:
         raise AppError("Unable to open the specified file") from e
